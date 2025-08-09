@@ -6,10 +6,13 @@
   "scripts": {
     "test": "ts-node test-enhanced-backtest.ts",
     "test:quick": "node -r ts-node/register test-enhanced-backtest.ts",
+    "test:alpaca": "ts-node run-alpaca-backtest.ts",
+    "test:alpaca:demo": "ts-node run-alpaca-backtest.ts --demo",
     "build": "tsc",
     "start": "ts-node lib/live-paper-trading-engine.ts",
     "start:live": "NODE_ENV=production ts-node lib/live-paper-trading-engine.ts",
     "backtest": "ts-node lib/backtest-engine.ts",
+    "backtest:real": "ts-node run-alpaca-backtest.ts",
     "dev": "ts-node --watch lib/live-paper-trading-engine.ts",
     "lint": "echo 'Linting not configured yet'",
     "clean": "rm -rf dist"
@@ -17,7 +20,9 @@
   "dependencies": {
     "typescript": "^5.0.0",
     "ts-node": "^10.9.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "@alpacahq/alpaca-trade-api": "^3.0.0",
+    "dotenv": "^16.0.0"
   },
   "devDependencies": {},
   "engines": {

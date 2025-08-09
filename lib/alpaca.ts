@@ -117,7 +117,7 @@ class AlpacaClient {
         return this.getOptionsChainFromSnapshots(symbol, expiration);
       }
 
-      const contractsData = await contractsResponse.json();
+      const contractsData: any = await contractsResponse.json();
       
       if (!contractsData.option_contracts || contractsData.option_contracts.length === 0) {
         console.log(`⚠️  No option contracts returned, using snapshots fallback`);
@@ -136,7 +136,7 @@ class AlpacaClient {
 
       let marketData: any = {};
       if (snapshotsResponse.ok) {
-        const snapshotsData = await snapshotsResponse.json();
+        const snapshotsData: any = await snapshotsResponse.json();
         marketData = snapshotsData.snapshots || {};
         console.log(`💰 Retrieved market data for ${Object.keys(marketData).length} contracts`);
       } else {
@@ -191,7 +191,7 @@ class AlpacaClient {
         return this.generateInstitutionalOptionsChain(symbol, currentPrice, expiration);
       }
 
-      const data = await response.json();
+      const data: any = await response.json();
       
       if (!data.snapshots || Object.keys(data.snapshots).length === 0) {
         console.log(`⚠️  No snapshots data, using synthetic data`);
