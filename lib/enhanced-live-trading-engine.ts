@@ -476,7 +476,7 @@ export class EnhancedLiveTradingEngine extends EventEmitter {
   private calculatePositionSentiment(position: EnhancedLivePosition): number {
     if (position.newsEvents.length === 0) return 0;
     
-    const sentimentValues = position.newsEvents.map(news => {
+    const sentimentValues: number[] = position.newsEvents.map(news => {
       switch (news.sentiment) {
         case 'positive': return 1;
         case 'negative': return -1;
@@ -484,7 +484,7 @@ export class EnhancedLiveTradingEngine extends EventEmitter {
       }
     });
     
-    return sentimentValues.reduce((sum, val) => sum + val, 0) / sentimentValues.length;
+    return sentimentValues.reduce((sum: number, val: number) => sum + val, 0) / sentimentValues.length;
   }
 
   /**

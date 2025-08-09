@@ -655,7 +655,13 @@ export class AlpacaRealTimeStream extends EventEmitter {
     marketData: boolean;
     news: boolean;
     options: boolean;
-    subscriptions: typeof this.subscriptions;
+    subscriptions: {
+      quotes: Set<string>;
+      trades: Set<string>;
+      bars: Set<string>;
+      news: Set<string>;
+      options: Set<string>;
+    };
   } {
     return {
       marketData: this.marketDataWs?.readyState === WebSocket.OPEN,
