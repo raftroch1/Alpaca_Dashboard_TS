@@ -1,0 +1,47 @@
+{
+  "name": "alpaca-dashboard-ts",
+  "version": "1.0.0",
+  "description": "Institutional-grade 0-DTE options trading system with advanced Greeks-based risk management",
+  "main": "test-enhanced-backtest.ts",
+  "scripts": {
+    "test": "ts-node test-enhanced-backtest.ts",
+    "test:quick": "node -r ts-node/register test-enhanced-backtest.ts",
+    "build": "tsc",
+    "start": "ts-node lib/live-paper-trading-engine.ts",
+    "start:live": "NODE_ENV=production ts-node lib/live-paper-trading-engine.ts",
+    "backtest": "ts-node lib/backtest-engine.ts",
+    "dev": "ts-node --watch lib/live-paper-trading-engine.ts",
+    "lint": "echo 'Linting not configured yet'",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0",
+    "@types/node": "^20.0.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "options-trading",
+    "0-dte",
+    "alpaca-api",
+    "typescript",
+    "backtesting",
+    "greeks",
+    "risk-management",
+    "trading-bot",
+    "financial-engineering",
+    "options-strategies"
+  ],
+  "author": "raftroch1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/raftroch1/Alpaca_Dashboard_TS.git"
+  },
+  "bugs": {
+    "url": "https://github.com/raftroch1/Alpaca_Dashboard_TS/issues"
+  },
+  "homepage": "https://github.com/raftroch1/Alpaca_Dashboard_TS#readme"
+}
