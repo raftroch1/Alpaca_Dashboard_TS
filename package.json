@@ -8,6 +8,8 @@
     "test:quick": "node -r ts-node/register test-enhanced-backtest.ts",
     "test:alpaca": "ts-node run-alpaca-backtest.ts",
     "test:alpaca:demo": "ts-node run-alpaca-backtest.ts --demo",
+    "test:stream": "ts-node test-real-time-stream.ts",
+    "start:enhanced": "ts-node lib/enhanced-live-trading-engine.ts",
     "build": "tsc",
     "start": "ts-node lib/live-paper-trading-engine.ts",
     "start:live": "NODE_ENV=production ts-node lib/live-paper-trading-engine.ts",
@@ -22,7 +24,9 @@
     "ts-node": "^10.9.0",
     "@types/node": "^20.0.0",
     "@alpacahq/alpaca-trade-api": "^3.0.0",
-    "dotenv": "^16.0.0"
+    "dotenv": "^16.0.0",
+    "ws": "^8.14.0",
+    "@types/ws": "^8.5.0"
   },
   "devDependencies": {},
   "engines": {
