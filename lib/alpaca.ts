@@ -678,7 +678,7 @@ class AlpacaClient {
       strikes.push(Math.round(currentPrice + offset));
     }
     
-    return [...new Set(strikes)].sort((a, b) => a - b);
+    return Array.from(new Set(strikes)).sort((a, b) => a - b);
   }
 
   private calculateRealisticImpliedVolatility(moneyness: number, timeValue: number): number {

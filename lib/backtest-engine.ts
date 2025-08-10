@@ -614,7 +614,13 @@ export class BacktestEngine {
             
             const netCredit = spread.netCredit * positionSize * 100;
             
-            if (Math.abs(spreadCost) <= currentBalance * 0.95) { // Leave 5% buffer
+            // CAPITAL PROTECTION: Ensure we don't risk more than we can afford
+            const maxPositionRisk = Math.min(
+              currentBalance * 0.20,  // Temporarily increased to 20% for demo
+              3000                    // Temporarily increased cap for demonstration
+            );
+            
+            if (Math.abs(spreadCost) <= maxPositionRisk) {
               
               // ENHANCED: Calculate Greeks for spread position
               const timeToExpiration = Math.max(0.001, 
@@ -1021,8 +1027,8 @@ export class BacktestEngine {
           }
           
           // 6. Volatility expansion: Exit if implied volatility spikes
-          const avgIV = (sellPutCurrent.impliedVolatility || 0.2 + sellCallCurrent.impliedVolatility || 0.2) / 2;
-          const entryIV = (spread.sellPut.impliedVolatility || 0.2 + spread.sellCall.impliedVolatility || 0.2) / 2;
+          const avgIV = ((sellPutCurrent.impliedVolatility || 0.2) + (sellCallCurrent.impliedVolatility || 0.2)) / 2;
+          const entryIV = ((spread.sellPut.impliedVolatility || 0.2) + (spread.sellCall.impliedVolatility || 0.2)) / 2;
           if (avgIV > entryIV * 1.5) { // 50% IV increase
             shouldExitCondor = true;
             exitReason = 'VOLATILITY_EXPANSION';
