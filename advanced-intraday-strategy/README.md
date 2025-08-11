@@ -112,6 +112,14 @@ if (signal.action !== 'NO_TRADE' && signal.signalQuality === 'EXCELLENT') {
 
 Multi-layered risk protection designed for the extreme leverage of 0DTE trading:
 
+
+
+#### **Greeks Limits**
+- Net Delta: ±$100 per $1 underlying move
+- Net Gamma: ±$50 exposure
+- Net Theta: -$200 maximum decay
+- Net Vega: ±$100 volatility exposure
+
 #### **Portfolio-Level Limits**
 - Maximum drawdown: 15%
 - Daily loss limit: $5,000
@@ -122,12 +130,6 @@ Multi-layered risk protection designed for the extreme leverage of 0DTE trading:
 - Maximum position size: 10 contracts
 - Maximum leverage: 5x
 - Maximum time exposure: 4 hours (0DTE)
-
-#### **Greeks Limits**
-- Net Delta: ±$100 per $1 underlying move
-- Net Gamma: ±$50 exposure
-- Net Theta: -$200 maximum decay
-- Net Vega: ±$100 volatility exposure
 
 #### **Kill Switch Triggers**
 - Portfolio drawdown ≥ 20%
@@ -250,6 +252,9 @@ npx ts-node test-advanced-strategy.ts
 - **Time Decay Protection:** Force exit when <30 min to expiry
 - **Trailing Stop Activation:** After 25% profit achieved
 - **Gamma Adjustment:** Options pricing reflects proximity to ATM
+- **Real-time Exit Monitoring:** Every minute bar triggers position checks
+- **Enhanced Option Pricing:** 3x delta for ITM, 5x decay for OTM
+- **Manual Exit Management:** No bracket orders (avoiding API errors)
 
 ## 📈 **CURRENT SYSTEM STATUS**
 
@@ -264,41 +269,48 @@ npx ts-node test-advanced-strategy.ts
 | **🚨 Risk Controls** | ✅ **ENFORCED** | Kill switches operational |
 
 ### **📁 SYSTEM FILES**
-- `enhanced-hybrid-backtest.ts` - **Proven profitable strategy**
-- `enhanced-paper-trading-engine.ts` - **Live trading system**
-- `start-paper-trading.ts` - **Quick launcher**
-- `test-paper-trading.ts` - **System validation**
+- `enhanced-hybrid-backtest.ts` - **Proven profitable strategy** (✅ Working)
+- `alpaca-paper-trading-engine.ts` - **Live Alpaca integration** (✅ Active)
+- `start-alpaca-paper-trading.ts` - **Quick launcher** (✅ Ready)
+- `test-alpaca-connection.ts` - **Connection validation** (✅ Working)
+- `debug-alpaca-connection.ts` - **Advanced diagnostics** (✅ Available)
+- `emergency-close-positions.ts` - **Emergency controls** (✅ Ready)
 
-## 🎬 **LIVE PAPER TRADING**
+## 🎬 **LIVE ALPACA PAPER TRADING**
 
-### **🚀 START PAPER TRADING NOW**
+### **🚀 START ALPACA PAPER TRADING NOW**
 
-#### **Method 1: Quick Launch**
+#### **Method 1: Direct Alpaca Integration (Recommended)**
 ```bash
-npx ts-node advanced-intraday-strategy/start-paper-trading.ts
+npx ts-node advanced-intraday-strategy/start-alpaca-paper-trading.ts
 ```
 
-#### **Method 2: Direct Engine**
+#### **Method 2: Test Connection First**
 ```bash
-npx ts-node advanced-intraday-strategy/enhanced-paper-trading-engine.ts start
+# Validate Alpaca connection
+npx ts-node advanced-intraday-strategy/test-alpaca-connection.ts
+
+# Debug if needed
+npx ts-node advanced-intraday-strategy/debug-alpaca-connection.ts
+
+# Then start live trading
+npx ts-node advanced-intraday-strategy/start-alpaca-paper-trading.ts
 ```
 
-#### **Method 3: Test First**
+#### **Method 3: Emergency Position Management**
 ```bash
-# Validate system
-npx ts-node advanced-intraday-strategy/test-paper-trading.ts
-
-# Then start trading
-npx ts-node advanced-intraday-strategy/start-paper-trading.ts
+# Emergency close all positions
+npx ts-node advanced-intraday-strategy/emergency-close-positions.ts
 ```
 
-### **📊 LIVE MONITORING FEATURES**
-- **⏰ Real-time P&L tracking** vs $193/day target
-- **📈 Trade frequency monitoring** (targeting 3.4/day)
-- **🎯 Win rate tracking** (targeting 77.8%+)
-- **⚡ Live signal generation** with confidence levels
-- **🛡️ Risk management alerts** and position limits
-- **📱 Hourly progress updates** and market status
+### **📊 LIVE ALPACA MONITORING FEATURES**
+- **⏰ Real-time Portfolio Tracking** via Alpaca Paper Account
+- **📈 Actual Order Execution** with fill confirmations
+- **🎯 Live P&L Calculation** from real option fills
+- **⚡ Enhanced Exit Monitoring** every minute with detailed logging
+- **🛡️ Dynamic Stop Loss Management** (30% initial, 15% trailing)
+- **📱 5-minute Portfolio Updates** with progress tracking
+- **🚨 Emergency Position Controls** for risk management
 
 ### **🚨 LIVE TRADING ALERTS**
 The system provides real-time notifications for:
@@ -308,8 +320,21 @@ The system provides real-time notifications for:
 - 🎯 **Target progress** throughout the day
 - ⚠️ **Risk warnings** if approaching limits
 
-### **📋 EXPECTED LIVE PERFORMANCE**
-Based on 8-day backtest validation:
+### **📋 LIVE TRADING STATUS - TODAY (Aug 11, 2025)**
+
+#### **✅ SYSTEM ACHIEVEMENTS:**
+- **🔗 Alpaca Integration:** Successfully connected and trading
+- **📈 Real Orders Executed:** 4 live 0-DTE options trades
+- **🛡️ Enhanced Exit System:** Active monitoring implemented
+- **⚡ Quick Risk Management:** Positions closed automatically
+
+#### **📊 ACTUAL LIVE PERFORMANCE:**
+- **Calls Traded:** SPY250811C00638000 (2 contracts)
+- **Puts Traded:** SPY250811P00637000 (2 contracts)  
+- **Exit Logic:** Time-based and stop-loss exits working
+- **Risk Controls:** 30% stops and 3:30 PM force close active
+
+#### **🎯 EXPECTED PERFORMANCE (Based on 8-day backtest):**
 - **💰 Daily Target:** $193 profit
 - **📈 Trade Frequency:** 3-4 trades per day
 - **⏱️ Hold Time:** ~14 minutes average
