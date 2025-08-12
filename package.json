@@ -17,7 +17,7 @@
     "test:3day": "ts-node test-3day-minute-bars.ts",
     "paper": "ts-node run-paper-trading.ts",
     "paper:1min": "ts-node run-paper-trading.ts --1min",
-    "paper:5min": "ts-node run-paper-trading.ts --5min", 
+    "paper:5min": "ts-node run-paper-trading.ts --5min",
     "paper:15min": "ts-node run-paper-trading.ts --15min",
     "paper:daily": "ts-node run-paper-trading.ts --daily",
     "paper:help": "ts-node run-paper-trading.ts --help",
@@ -51,15 +51,14 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "typescript": "^5.0.0",
-    "ts-node": "^10.9.0",
+    "@alpacahq/alpaca-trade-api": "^3.1.3",
     "@types/node": "^20.0.0",
-    "@alpacahq/alpaca-trade-api": "^3.0.0",
-    "dotenv": "^16.0.0",
-    "ws": "^8.14.0",
-    "@types/ws": "^8.5.0"
+    "@types/ws": "^8.5.0",
+    "dotenv": "^16.6.1",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0",
+    "ws": "^8.14.0"
   },
-  "devDependencies": {},
   "engines": {
     "node": ">=18.0.0"
   },
