@@ -74,7 +74,7 @@ export class AlpacaPaperTradingEngine {
   private lastSignalTime = 0;
   
   // Enhanced 0-DTE parameters (CORRECTED FOR $200/DAY TARGET)
-  private readonly DAILY_TRADE_TARGET = 2; // 2 bigger trades instead of 3 smaller
+  // private readonly DAILY_TRADE_TARGET = 2; // REMOVED: No longer limiting daily trades
   private readonly TARGET_WIN_SIZE = 200; // $200 target wins
   private readonly TARGET_LOSS_SIZE = 150; // $150 max losses
   private readonly MIN_SIGNAL_SPACING_MINUTES = 5; // 5 minutes to avoid over-trading
@@ -82,8 +82,8 @@ export class AlpacaPaperTradingEngine {
   
   // 0-DTE risk management
   // Exit strategy parameters (optimized for 0-DTE with breathing room)
-  private readonly INITIAL_STOP_LOSS_PCT = 0.50;  // 50% stop loss (more room for volatility)
-  private readonly PROFIT_TARGET_PCT = 0.40;      // 40% profit target (quicker wins)
+  private readonly INITIAL_STOP_LOSS_PCT = 0.35;  // 35% stop loss
+  private readonly PROFIT_TARGET_PCT = 0.50;      // 50% profit target
   private readonly TRAIL_ACTIVATION_PCT = 0.20;   // Trail after 20% profit
   private readonly TRAIL_STOP_PCT = 0.10;         // 10% trailing stop
   private readonly FORCE_EXIT_TIME = 15.5; // 3:30 PM
@@ -103,7 +103,7 @@ export class AlpacaPaperTradingEngine {
     console.log('   ✅ Real Alpaca pricing for accurate exits');
     console.log('');
     console.log(`   🎯 Daily Target: $${this.DAILY_PNL_TARGET}/day`);
-    console.log(`   📊 Target Frequency: ${this.DAILY_TRADE_TARGET} trades/day`);
+    console.log(`   📊 Target Frequency: Unlimited trades/day`);
     console.log(`   🛡️  0-DTE Risk: ${this.INITIAL_STOP_LOSS_PCT*100}% stop, ${this.TRAIL_STOP_PCT*100}% trail`);
   }
   
@@ -548,15 +548,12 @@ export class AlpacaPaperTradingEngine {
       return breakoutSignal;
     }
     
-    // PRIORITY 4: Time-based signals (fallback for daily targets)
-    const remainingSignals = this.DAILY_TRADE_TARGET - this.dailyTradesGenerated;
-    if (remainingSignals > 0) {
-      const timeSignal = this.generateEnhancedTimeSignal(marketData, currentTime);
-      if (timeSignal) {
-        this.dailyTradesGenerated++;
-        this.lastSignalTime = currentTimeMs;
-        return timeSignal;
-      }
+    // PRIORITY 4: Time-based signals (unlimited daily trades)
+    const timeSignal = this.generateEnhancedTimeSignal(marketData, currentTime);
+    if (timeSignal) {
+      this.dailyTradesGenerated++;
+      this.lastSignalTime = currentTimeMs;
+      return timeSignal;
     }
     
     return null;
