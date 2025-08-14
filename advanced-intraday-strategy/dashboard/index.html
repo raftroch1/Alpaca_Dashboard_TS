@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>0-DTE Trading Strategy Dashboard</title>
+    <link rel="stylesheet" href="assets/dashboard.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+</head>
+<body>
+    <!-- Header -->
+    <header class="dashboard-header">
+        <div class="header-content">
+            <h1>📊 0-DTE Strategy Dashboard</h1>
+            <div class="connection-status">
+                <div id="connectionIndicator" class="status-indicator disconnected">
+                    <span class="status-dot"></span>
+                    <span id="connectionText">Disconnected</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Container -->
+    <div class="dashboard-container">
+        
+        <!-- Control Panels Row -->
+        <div class="control-panels">
+            
+            <!-- Trading Targets Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>🎯 Trading Targets</h3>
+                    <div class="preset-buttons">
+                        <button class="preset-btn" data-preset="conservative">Conservative</button>
+                        <button class="preset-btn active" data-preset="balanced">Balanced</button>
+                        <button class="preset-btn" data-preset="aggressive">Aggressive</button>
+                    </div>
+                </div>
+                
+                <div class="parameter-grid">
+                    <div class="parameter-control">
+                        <label for="dailyPnLTarget">Daily P&L Target ($)</label>
+                        <input type="number" id="dailyPnLTarget" value="200" min="50" max="1000" step="25">
+                        <span class="parameter-info">Current: $193/day proven</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="targetWinSize">Target Win Size ($)</label>
+                        <input type="number" id="targetWinSize" value="200" min="50" max="500" step="25">
+                        <span class="parameter-info">Per winning trade</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="targetLossSize">Target Loss Size ($)</label>
+                        <input type="number" id="targetLossSize" value="150" min="50" max="300" step="25">
+                        <span class="parameter-info">Per losing trade</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="dailyTradeTarget">Daily Trade Limit</label>
+                        <select id="dailyTradeTarget">
+                            <option value="null">Unlimited</option>
+                            <option value="1">1 Trade</option>
+                            <option value="2">2 Trades</option>
+                            <option value="3">3 Trades</option>
+                            <option value="5">5 Trades</option>
+                            <option value="10">10 Trades</option>
+                        </select>
+                        <span class="parameter-info">Currently unlimited</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="accountSize">Account Size ($)</label>
+                        <input type="number" id="accountSize" value="25000" min="10000" max="100000" step="5000">
+                        <span class="parameter-info">PDT minimum: $25,000</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="maxConcurrentPositions">Max Concurrent Positions</label>
+                        <input type="number" id="maxConcurrentPositions" value="3" min="1" max="10" step="1">
+                        <span class="parameter-info">Risk diversification</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risk Management Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>🛡️ Risk Management</h3>
+                    <div class="feature-toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="usePartialProfitTaking">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Partial Profit Taking</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="parameter-grid">
+                    <div class="parameter-control">
+                        <label for="initialStopLossPct">Initial Stop Loss (%)</label>
+                        <input type="number" id="initialStopLossPct" value="35" min="15" max="50" step="5">
+                        <span class="parameter-info">Currently: 35%</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="profitTargetPct">Profit Target (%)</label>
+                        <input type="number" id="profitTargetPct" value="50" min="20" max="100" step="5">
+                        <span class="parameter-info">Currently: 50%</span>
+                    </div>
+                    
+                    <div class="parameter-control partial-profit-control">
+                        <label for="partialProfitLevel">Partial Profit Level (%)</label>
+                        <input type="number" id="partialProfitLevel" value="30" min="15" max="50" step="5" disabled>
+                        <span class="parameter-info">Take partial profit at</span>
+                    </div>
+                    
+                    <div class="parameter-control partial-profit-control">
+                        <label for="partialProfitSize">Partial Position Size (%)</label>
+                        <input type="number" id="partialProfitSize" value="50" min="25" max="75" step="5" disabled>
+                        <span class="parameter-info">% of position to close</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="trailActivationPct">Trail Activation (%)</label>
+                        <input type="number" id="trailActivationPct" value="20" min="10" max="40" step="5">
+                        <span class="parameter-info">Start trailing after</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="trailStopPct">Trailing Stop (%)</label>
+                        <input type="number" id="trailStopPct" value="10" min="5" max="25" step="1">
+                        <span class="parameter-info">Trail distance</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="maxRiskPerTradePct">Max Risk Per Trade (%)</label>
+                        <input type="number" id="maxRiskPerTradePct" value="2.0" min="0.5" max="5.0" step="0.25">
+                        <span class="parameter-info">% of account</span>
+                    </div>
+                    
+                    <div class="parameter-control partial-profit-control">
+                        <label for="moveStopToBreakeven">Move Stop to Breakeven</label>
+                        <select id="moveStopToBreakeven" disabled>
+                            <option value="false">No</option>
+                            <option value="true">Yes</option>
+                        </select>
+                        <span class="parameter-info">After partial profit</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signal Controls Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>📊 Signal Controls</h3>
+                    <div class="signal-toggles">
+                        <label class="signal-toggle">
+                            <input type="checkbox" id="enableRsiSignals" checked>
+                            <span>RSI</span>
+                        </label>
+                        <label class="signal-toggle">
+                            <input type="checkbox" id="enableMomentumSignals" checked>
+                            <span>Momentum</span>
+                        </label>
+                        <label class="signal-toggle">
+                            <input type="checkbox" id="enableBreakoutSignals" checked>
+                            <span>Breakout</span>
+                        </label>
+                        <label class="signal-toggle">
+                            <input type="checkbox" id="enableTimeBasedSignals" checked>
+                            <span>Time-based</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="parameter-grid">
+                    <div class="parameter-control">
+                        <label for="minSignalSpacingMinutes">Signal Spacing (minutes)</label>
+                        <select id="minSignalSpacingMinutes">
+                            <option value="5" selected>5 minutes</option>
+                            <option value="15">15 minutes</option>
+                            <option value="30">30 minutes</option>
+                            <option value="60">60 minutes</option>
+                        </select>
+                        <span class="parameter-info">Between signals</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="rsiOversold">RSI Oversold Level</label>
+                        <input type="number" id="rsiOversold" value="25" min="10" max="40" step="5">
+                        <span class="parameter-info">Buy calls below</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="rsiOverbought">RSI Overbought Level</label>
+                        <input type="number" id="rsiOverbought" value="75" min="60" max="90" step="5">
+                        <span class="parameter-info">Buy puts above</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="momentumThresholdPct">Momentum Threshold (%)</label>
+                        <input type="number" id="momentumThresholdPct" value="0.15" min="0.05" max="0.50" step="0.05">
+                        <span class="parameter-info">Price move required</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="volumeConfirmationRatio">Volume Confirmation (x)</label>
+                        <input type="number" id="volumeConfirmationRatio" value="1.5" min="1.2" max="3.0" step="0.1">
+                        <span class="parameter-info">Times average volume</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="breakoutThresholdPct">Breakout Threshold (%)</label>
+                        <input type="number" id="breakoutThresholdPct" value="0.10" min="0.05" max="0.25" step="0.05">
+                        <span class="parameter-info">Above/below range</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="forceExitTime">Force Exit Time</label>
+                        <select id="forceExitTime">
+                            <option value="15.0">3:00 PM</option>
+                            <option value="15.5" selected>3:30 PM</option>
+                            <option value="16.0">4:00 PM</option>
+                        </select>
+                        <span class="parameter-info">0-DTE protection</span>
+                    </div>
+                    
+                    <div class="parameter-control">
+                        <label for="reducedSignalSpacing">Reduced Spacing Mode</label>
+                        <select id="reducedSignalSpacing">
+                            <option value="false" selected>Standard</option>
+                            <option value="true">Active (15min → 7.5min)</option>
+                        </select>
+                        <span class="parameter-info">For trending markets</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Display Panel -->
+        <div class="status-panel">
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>📈 Live Trading Status</h3>
+                    <div class="status-indicators">
+                        <div id="tradingStatus" class="trading-status stopped">
+                            <span class="status-dot"></span>
+                            <span>Stopped</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Live Stats Grid -->
+                <div class="live-stats">
+                    <div class="stat-card">
+                        <div class="stat-icon">💰</div>
+                        <div class="stat-value profit" id="currentPnL">+$0.00</div>
+                        <div class="stat-label">Today's P&L</div>
+                        <div class="stat-target" id="pnlProgress">0% of $200 target</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value neutral" id="tradesCount">0</div>
+                        <div class="stat-label">Trades Today</div>
+                        <div class="stat-target" id="tradesTarget">Unlimited</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-value" id="winRate">0.0%</div>
+                        <div class="stat-label">Win Rate</div>
+                        <div class="stat-target">Target: 77.8%</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚡</div>
+                        <div class="stat-value" id="avgWin">$0</div>
+                        <div class="stat-label">Avg Win</div>
+                        <div class="stat-target" id="avgLoss">Avg Loss: $0</div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="applyParametersBtn">
+                        <span class="btn-icon">📝</span>
+                        Apply Settings
+                    </button>
+                    <button class="btn btn-info" id="runBacktestBtn">
+                        <span class="btn-icon">📊</span>
+                        Run Backtest
+                    </button>
+                    <button class="btn btn-warning" id="startPaperTradingBtn">
+                        <span class="btn-icon">🚀</span>
+                        Start Paper Trading
+                    </button>
+                    <button class="btn btn-danger" id="emergencyStopBtn">
+                        <span class="btn-icon">🛑</span>
+                        Emergency Stop
+                    </button>
+                </div>
+                
+                <!-- Activity Log -->
+                <div class="log-container">
+                    <div class="log-header">
+                        <h4>📋 Activity Log</h4>
+                        <button class="btn-small" id="clearLogBtn">Clear</button>
+                    </div>
+                    <div id="logOutput" class="log-output">
+                        <div class="log-entry info">
+                            <span class="log-time">[--:--:--]</span>
+                            <span class="log-message">Dashboard initialized, waiting for connection...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backtest Results Modal -->
+        <div id="backtestModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>📊 Backtest Results</h3>
+                    <button class="modal-close" id="closeModalBtn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="backtestResults">
+                        <div class="results-loading">
+                            <div class="spinner"></div>
+                            <p>Running backtest with your parameters...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="assets/dashboard.js"></script>
+</body>
+</html>

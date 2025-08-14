@@ -1,0 +1,36 @@
+{
+  "name": "trading-dashboard",
+  "version": "1.0.0",
+  "description": "Real-time trading strategy dashboard for 0-DTE options trading",
+  "main": "launch-dashboard.ts",
+  "scripts": {
+    "start": "npx ts-node launch-dashboard.ts",
+    "server": "npx ts-node dashboard-server.ts",
+    "dev": "npx ts-node --watch launch-dashboard.ts",
+    "build": "tsc",
+    "test": "npx ts-node --transpile-only test-dashboard.ts"
+  },
+  "keywords": [
+    "trading",
+    "dashboard",
+    "options",
+    "0-DTE",
+    "strategy",
+    "backtesting",
+    "real-time",
+    "websocket"
+  ],
+  "author": "Trading Strategy Developer",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

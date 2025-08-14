@@ -1,0 +1,703 @@
+/**
+ * Trading Dashboard JavaScript
+ * 
+ * Handles real-time parameter updates, WebSocket communication,
+ * and user interface interactions for the 0-DTE trading strategy
+ */
+
+class TradingDashboard {
+    constructor() {
+        this.ws = null;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        this.isConnected = false;
+        this.currentConfig = this.getDefaultConfig();
+        
+        this.initializeUI();
+        this.initializeWebSocket();
+        this.bindEvents();
+        this.loadPreset('balanced'); // Start with balanced preset
+    }
+
+    getDefaultConfig() {
+        return {
+            dailyPnLTarget: 200,
+            targetWinSize: 200,
+            targetLossSize: 150,
+            dailyTradeTarget: null,
+            initialStopLossPct: 35,
+            profitTargetPct: 50,
+            trailActivationPct: 20,
+            trailStopPct: 10,
+            maxRiskPerTradePct: 2.0,
+            minSignalSpacingMinutes: 5,
+            rsiOversold: 25,
+            rsiOverbought: 75,
+            momentumThresholdPct: 0.15,
+            volumeConfirmationRatio: 1.5,
+            breakoutThresholdPct: 0.10,
+            forceExitTime: 15.5,
+            accountSize: 25000,
+            maxConcurrentPositions: 3,
+            enableRsiSignals: true,
+            enableMomentumSignals: true,
+            enableBreakoutSignals: true,
+            enableTimeBasedSignals: true,
+            usePartialProfitTaking: false,
+            partialProfitLevel: 30,
+            partialProfitSize: 50,
+            moveStopToBreakeven: false,
+            reducedSignalSpacing: false
+        };
+    }
+
+    initializeUI() {
+        // Set initial values
+        Object.keys(this.currentConfig).forEach(key => {
+            const element = document.getElementById(key);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = this.currentConfig[key];
+                } else {
+                    element.value = this.currentConfig[key] === null ? 'null' : this.currentConfig[key];
+                }
+            }
+        });
+
+        // Update UI state
+        this.updatePartialProfitControls();
+        this.updateConnectionStatus(false);
+        this.addLog('Dashboard initialized', 'info');
+    }
+
+    initializeWebSocket() {
+        try {
+            this.ws = new WebSocket('ws://localhost:8080');
+            
+            this.ws.onopen = () => {
+                this.isConnected = true;
+                this.reconnectAttempts = 0;
+                this.updateConnectionStatus(true);
+                this.addLog('Connected to trading engine', 'success');
+                
+                // Request current status
+                this.sendMessage({
+                    type: 'REQUEST_STATUS'
+                });
+            };
+
+            this.ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.handleMessage(data);
+                } catch (error) {
+                    console.error('Failed to parse WebSocket message:', error);
+                }
+            };
+
+            this.ws.onclose = () => {
+                this.isConnected = false;
+                this.updateConnectionStatus(false);
+                this.addLog('Connection lost - attempting reconnect...', 'warning');
+                this.scheduleReconnect();
+            };
+
+            this.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                this.addLog('Connection error occurred', 'error');
+            };
+
+        } catch (error) {
+            console.error('Failed to initialize WebSocket:', error);
+            this.addLog('Failed to connect to trading engine', 'error');
+            this.scheduleReconnect();
+        }
+    }
+
+    scheduleReconnect() {
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            this.reconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+            
+            setTimeout(() => {
+                this.addLog(`Reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`, 'info');
+                this.initializeWebSocket();
+            }, delay);
+        } else {
+            this.addLog('Max reconnection attempts reached. Please refresh page.', 'error');
+        }
+    }
+
+    bindEvents() {
+        // Parameter change handlers
+        document.addEventListener('change', (event) => {
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') {
+                this.handleParameterChange(event.target);
+            }
+        });
+
+        // Preset buttons
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const preset = e.target.dataset.preset;
+                this.loadPreset(preset);
+            });
+        });
+
+        // Action buttons
+        document.getElementById('applyParametersBtn').addEventListener('click', () => {
+            this.applyParameters();
+        });
+
+        document.getElementById('runBacktestBtn').addEventListener('click', () => {
+            this.runBacktest();
+        });
+
+        document.getElementById('startPaperTradingBtn').addEventListener('click', () => {
+            this.startPaperTrading();
+        });
+
+        document.getElementById('emergencyStopBtn').addEventListener('click', () => {
+            this.emergencyStop();
+        });
+
+        document.getElementById('clearLogBtn').addEventListener('click', () => {
+            this.clearLog();
+        });
+
+        document.getElementById('closeModalBtn').addEventListener('click', () => {
+            this.closeModal();
+        });
+
+        // Partial profit toggle
+        document.getElementById('usePartialProfitTaking').addEventListener('change', () => {
+            this.updatePartialProfitControls();
+        });
+
+        // Click outside modal to close
+        document.getElementById('backtestModal').addEventListener('click', (e) => {
+            if (e.target.id === 'backtestModal') {
+                this.closeModal();
+            }
+        });
+    }
+
+    handleParameterChange(element) {
+        let value = element.value;
+        
+        // Convert values
+        if (element.type === 'number') {
+            value = parseFloat(value);
+        } else if (element.type === 'checkbox') {
+            value = element.checked;
+        } else if (value === 'null') {
+            value = null;
+        } else if (value === 'true' || value === 'false') {
+            value = value === 'true';
+        }
+
+        this.currentConfig[element.id] = value;
+        this.addLog(`Updated ${element.id}: ${element.value}`, 'info');
+
+        // Special handling for partial profit toggle
+        if (element.id === 'usePartialProfitTaking') {
+            this.updatePartialProfitControls();
+        }
+    }
+
+    updatePartialProfitControls() {
+        const enabled = document.getElementById('usePartialProfitTaking').checked;
+        const controls = document.querySelectorAll('.partial-profit-control');
+        
+        controls.forEach(control => {
+            const inputs = control.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                input.disabled = !enabled;
+            });
+            
+            if (enabled) {
+                control.classList.add('enabled');
+            } else {
+                control.classList.remove('enabled');
+            }
+        });
+    }
+
+    loadPreset(presetName) {
+        // Update active button
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.preset === presetName) {
+                btn.classList.add('active');
+            }
+        });
+
+        const presets = {
+            conservative: {
+                dailyPnLTarget: 100,
+                targetWinSize: 100,
+                targetLossSize: 75,
+                dailyTradeTarget: 2,
+                initialStopLossPct: 25,
+                profitTargetPct: 40,
+                trailActivationPct: 15,
+                trailStopPct: 8,
+                minSignalSpacingMinutes: 30,
+                rsiOversold: 20,
+                rsiOverbought: 80,
+                momentumThresholdPct: 0.20,
+                volumeConfirmationRatio: 2.0,
+                breakoutThresholdPct: 0.15,
+                forceExitTime: 15.0,
+                maxRiskPerTradePct: 1.5,
+                maxConcurrentPositions: 2,
+                enableBreakoutSignals: false,
+                enableTimeBasedSignals: false,
+                usePartialProfitTaking: true,
+                partialProfitLevel: 25,
+                moveStopToBreakeven: true,
+                reducedSignalSpacing: false
+            },
+            balanced: {
+                dailyPnLTarget: 200,
+                targetWinSize: 200,
+                targetLossSize: 150,
+                dailyTradeTarget: null,
+                initialStopLossPct: 35,
+                profitTargetPct: 50,
+                trailActivationPct: 20,
+                trailStopPct: 10,
+                minSignalSpacingMinutes: 5,
+                rsiOversold: 25,
+                rsiOverbought: 75,
+                momentumThresholdPct: 0.15,
+                volumeConfirmationRatio: 1.5,
+                breakoutThresholdPct: 0.10,
+                forceExitTime: 15.5,
+                maxRiskPerTradePct: 2.0,
+                maxConcurrentPositions: 3,
+                enableRsiSignals: true,
+                enableMomentumSignals: true,
+                enableBreakoutSignals: true,
+                enableTimeBasedSignals: true,
+                usePartialProfitTaking: false,
+                partialProfitLevel: 30,
+                partialProfitSize: 50,
+                moveStopToBreakeven: false,
+                reducedSignalSpacing: false
+            },
+            aggressive: {
+                dailyPnLTarget: 400,
+                targetWinSize: 300,
+                targetLossSize: 200,
+                dailyTradeTarget: null,
+                initialStopLossPct: 40,
+                profitTargetPct: 60,
+                trailActivationPct: 25,
+                trailStopPct: 12,
+                minSignalSpacingMinutes: 5,
+                rsiOversold: 30,
+                rsiOverbought: 70,
+                momentumThresholdPct: 0.12,
+                volumeConfirmationRatio: 1.3,
+                breakoutThresholdPct: 0.08,
+                forceExitTime: 15.5,
+                maxRiskPerTradePct: 2.5,
+                maxConcurrentPositions: 5,
+                enableRsiSignals: true,
+                enableMomentumSignals: true,
+                enableBreakoutSignals: true,
+                enableTimeBasedSignals: true,
+                usePartialProfitTaking: true,
+                partialProfitLevel: 35,
+                partialProfitSize: 40,
+                moveStopToBreakeven: true,
+                reducedSignalSpacing: true
+            }
+        };
+
+        const preset = presets[presetName];
+        if (preset) {
+            // Update configuration
+            this.currentConfig = { ...this.currentConfig, ...preset };
+            
+            // Update UI elements
+            Object.keys(preset).forEach(key => {
+                const element = document.getElementById(key);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = preset[key];
+                    } else {
+                        element.value = preset[key] === null ? 'null' : preset[key];
+                    }
+                }
+            });
+
+            this.updatePartialProfitControls();
+            this.addLog(`Loaded ${presetName.toUpperCase()} preset`, 'success');
+        }
+    }
+
+    applyParameters() {
+        const config = this.gatherCurrentConfig();
+        
+        if (this.isConnected) {
+            this.sendMessage({
+                type: 'UPDATE_PARAMETERS',
+                config: config
+            });
+            this.addLog('Parameters sent to trading engine', 'success');
+        } else {
+            this.addLog('Not connected to trading engine', 'error');
+        }
+    }
+
+    runBacktest() {
+        const config = this.gatherCurrentConfig();
+        
+        if (this.isConnected) {
+            this.showModal();
+            this.showBacktestLoading();
+            
+            this.sendMessage({
+                type: 'RUN_BACKTEST',
+                config: config
+            });
+            this.addLog('Starting backtest with current parameters...', 'info');
+        } else {
+            this.addLog('Not connected to trading engine', 'error');
+        }
+    }
+
+    startPaperTrading() {
+        const config = this.gatherCurrentConfig();
+        
+        if (this.isConnected) {
+            this.sendMessage({
+                type: 'START_PAPER_TRADING',
+                config: config
+            });
+            this.addLog('Starting paper trading...', 'info');
+        } else {
+            this.addLog('Not connected to trading engine', 'error');
+        }
+    }
+
+    emergencyStop() {
+        if (this.isConnected) {
+            this.sendMessage({
+                type: 'EMERGENCY_STOP'
+            });
+            this.addLog('Emergency stop triggered', 'warning');
+        } else {
+            this.addLog('Not connected to trading engine', 'error');
+        }
+    }
+
+    gatherCurrentConfig() {
+        const config = {};
+        
+        // Fields that are displayed as percentages but need to be stored as decimals
+        const percentageFields = [
+            'initialStopLossPct', 'profitTargetPct', 'trailActivationPct', 
+            'trailStopPct', 'maxRiskPerTradePct', 'maxDrawdownPct',
+            'partialProfitLevel', 'partialProfitSize', 'momentumThresholdPct',
+            'breakoutThresholdPct'
+        ];
+        
+        Object.keys(this.currentConfig).forEach(key => {
+            const element = document.getElementById(key);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    config[key] = element.checked;
+                } else if (element.type === 'number') {
+                    let value = parseFloat(element.value);
+                    
+                    // Convert percentage fields to decimals
+                    if (percentageFields.includes(key)) {
+                        value = value / 100;
+                    }
+                    
+                    config[key] = value;
+                } else {
+                    const value = element.value;
+                    config[key] = value === 'null' ? null : 
+                                 value === 'true' ? true : 
+                                 value === 'false' ? false : value;
+                }
+            }
+        });
+        
+        return config;
+    }
+
+    sendMessage(message) {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify(message));
+        }
+    }
+
+    handleMessage(data) {
+        switch (data.type) {
+            case 'STATUS_UPDATE':
+                this.updateStatus(data);
+                break;
+            case 'LIVE_UPDATE':
+                this.updateLiveStats(data.data);
+                break;
+            case 'BACKTEST_RESULTS':
+                this.showBacktestResults(data.results);
+                break;
+            case 'PARAMETERS_UPDATED':
+                this.addLog('Parameters applied successfully', 'success');
+                break;
+            case 'EMERGENCY_STOPPED':
+                this.updateTradingStatus('stopped');
+                this.addLog('All trading stopped', 'warning');
+                break;
+            case 'ERROR':
+                this.addLog(`Error: ${data.message}`, 'error');
+                break;
+            default:
+                console.log('Unknown message type:', data.type);
+        }
+    }
+
+    updateStatus(data) {
+        if (data.parameters) {
+            this.currentConfig = { ...this.currentConfig, ...data.parameters };
+        }
+        
+        if (data.isTrading !== undefined) {
+            this.updateTradingStatus(data.isTrading ? 'running' : 'stopped');
+        }
+    }
+
+    updateLiveStats(data) {
+        if (data.pnl !== undefined) {
+            const pnlElement = document.getElementById('currentPnL');
+            const sign = data.pnl >= 0 ? '+' : '';
+            pnlElement.textContent = `${sign}$${data.pnl.toFixed(2)}`;
+            pnlElement.className = `stat-value ${data.pnl >= 0 ? 'profit' : 'loss'}`;
+            
+            // Update progress
+            const progressElement = document.getElementById('pnlProgress');
+            const target = this.currentConfig.dailyPnLTarget || 200;
+            const progress = (data.pnl / target * 100).toFixed(1);
+            progressElement.textContent = `${progress}% of $${target} target`;
+        }
+
+        if (data.tradesCount !== undefined) {
+            const tradesElement = document.getElementById('tradesCount');
+            tradesElement.textContent = data.tradesCount;
+            
+            const targetElement = document.getElementById('tradesTarget');
+            const limit = data.tradeLimit || 'Unlimited';
+            targetElement.textContent = limit === 'Unlimited' ? 'Unlimited' : `Limit: ${limit}`;
+        }
+
+        if (data.winRate !== undefined) {
+            document.getElementById('winRate').textContent = `${(data.winRate * 100).toFixed(1)}%`;
+        }
+
+        if (data.avgWin !== undefined) {
+            document.getElementById('avgWin').textContent = `$${data.avgWin.toFixed(0)}`;
+        }
+
+        if (data.avgLoss !== undefined) {
+            document.getElementById('avgLoss').textContent = `Avg Loss: $${data.avgLoss.toFixed(0)}`;
+        }
+
+        if (data.isRunning !== undefined) {
+            this.updateTradingStatus(data.isRunning ? 'running' : 'stopped');
+        }
+    }
+
+    updateTradingStatus(status) {
+        const statusElement = document.getElementById('tradingStatus');
+        statusElement.className = `trading-status ${status}`;
+        statusElement.innerHTML = `
+            <span class="status-dot"></span>
+            <span>${status === 'running' ? 'Running' : 'Stopped'}</span>
+        `;
+    }
+
+    updateConnectionStatus(connected) {
+        const indicator = document.getElementById('connectionIndicator');
+        const text = document.getElementById('connectionText');
+        
+        indicator.className = `status-indicator ${connected ? 'connected' : 'disconnected'}`;
+        text.textContent = connected ? 'Connected' : 'Disconnected';
+    }
+
+    showModal() {
+        document.getElementById('backtestModal').classList.add('show');
+    }
+
+    closeModal() {
+        document.getElementById('backtestModal').classList.remove('show');
+    }
+
+    showBacktestLoading() {
+        document.getElementById('backtestResults').innerHTML = `
+            <div class="results-loading">
+                <div class="spinner"></div>
+                <p>Running backtest with your parameters...</p>
+                <p style="font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 10px;">
+                    Testing last 3 days of market data
+                </p>
+            </div>
+        `;
+    }
+
+    showBacktestResults(results) {
+        const resultsHtml = `
+            <div class="backtest-results">
+                <div class="results-summary">
+                    <h4>📊 Backtest Summary</h4>
+                    <div class="results-grid">
+                        <div class="result-item">
+                            <span class="result-label">Total Trades</span>
+                            <span class="result-value">${results.totalTrades}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Win Rate</span>
+                            <span class="result-value ${results.winRate >= 0.6 ? 'profit' : 'loss'}">
+                                ${(results.winRate * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Total Return</span>
+                            <span class="result-value ${results.totalReturn >= 0 ? 'profit' : 'loss'}">
+                                ${results.totalReturn >= 0 ? '+' : ''}${results.totalReturn.toFixed(2)}%
+                            </span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Avg Daily P&L</span>
+                            <span class="result-value ${results.avgDailyPnL >= 0 ? 'profit' : 'loss'}">
+                                ${results.avgDailyPnL >= 0 ? '+' : ''}$${results.avgDailyPnL.toFixed(2)}
+                            </span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Max Drawdown</span>
+                            <span class="result-value loss">
+                                ${(results.maxDrawdown * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Target Achievement</span>
+                            <span class="result-value ${results.avgDailyPnL >= this.currentConfig.dailyPnLTarget ? 'profit' : 'loss'}">
+                                ${(results.avgDailyPnL / this.currentConfig.dailyPnLTarget * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="results-actions">
+                    <button class="btn btn-primary" onclick="dashboard.applyParameters()">
+                        Use These Parameters
+                    </button>
+                    <button class="btn btn-info" onclick="dashboard.closeModal()">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('backtestResults').innerHTML = resultsHtml;
+        this.addLog(`Backtest completed: ${results.totalTrades} trades, ${(results.winRate * 100).toFixed(1)}% win rate`, 'success');
+    }
+
+    addLog(message, type = 'info') {
+        const logOutput = document.getElementById('logOutput');
+        const timestamp = new Date().toLocaleTimeString();
+        
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry ${type}`;
+        logEntry.innerHTML = `
+            <span class="log-time">[${timestamp}]</span>
+            <span class="log-message">${message}</span>
+        `;
+        
+        logOutput.appendChild(logEntry);
+        logOutput.scrollTop = logOutput.scrollHeight;
+
+        // Keep only last 100 log entries
+        while (logOutput.children.length > 100) {
+            logOutput.removeChild(logOutput.firstChild);
+        }
+    }
+
+    clearLog() {
+        document.getElementById('logOutput').innerHTML = '';
+        this.addLog('Log cleared', 'info');
+    }
+}
+
+// Additional CSS for backtest results
+const additionalCSS = `
+.backtest-results {
+    color: white;
+}
+
+.results-summary h4 {
+    color: #4CAF50;
+    margin-bottom: 20px;
+    font-size: 16px;
+}
+
+.results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.result-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.result-label {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.result-value {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.result-value.profit { color: #4CAF50; }
+.result-value.loss { color: #f44336; }
+
+.results-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+@media (max-width: 600px) {
+    .results-grid {
+        grid-template-columns: 1fr;
+    }
+}
+`;
+
+// Inject additional CSS
+const style = document.createElement('style');
+style.textContent = additionalCSS;
+document.head.appendChild(style);
+
+// Initialize dashboard when DOM is loaded
+let dashboard;
+document.addEventListener('DOMContentLoaded', () => {
+    dashboard = new TradingDashboard();
+});
+
+// Global function for button handlers
+window.dashboard = dashboard;
