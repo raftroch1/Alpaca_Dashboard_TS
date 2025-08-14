@@ -192,6 +192,7 @@ Run the complete test suite to validate all components:
 ```bash
 cd advanced-intraday-strategy
 npx ts-node test-advanced-strategy.ts
+npx ts-node advanced-intraday-strategy/start-alpaca-paper-trading.ts
 ```
 
 **Test Coverage:**
@@ -410,10 +411,17 @@ if (riskStatus.killSwitchTriggered) {
 ## 🎯 **IMMEDIATE NEXT STEPS**
 
 ### **🔥 TODAY'S ACTION PLAN**
-1. **✅ STEP 1: START PAPER TRADING** 
+1. **✅ STEP 1: START ENHANCED PAPER TRADING** 
    ```bash
-   npx ts-node advanced-intraday-strategy/start-paper-trading.ts
+   npx ts-node advanced-intraday-strategy/start-alpaca-paper-trading.ts
    ```
+   
+   **Enhanced Features (remove-trade-limit-fix-stop-loss branch):**
+   - ✅ **Unlimited daily trades** (removed 2-trade limit)
+   - ✅ **35% stop loss** (optimized from 50%)
+   - ✅ **50% profit target** (maintained)
+   - ✅ **1-minute bar analysis** for precise entries
+   - ✅ **Real-time signal generation** with advanced indicators
 
 2. **📊 STEP 2: Monitor Live Performance**
    - Track real-time P&L vs $193 target
