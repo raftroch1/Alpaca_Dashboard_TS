@@ -516,11 +516,11 @@ export class AlpacaPaperTradingEngine {
       this.dailyTradesGenerated = 0;
     }
     
-    // Check signal spacing (30 minutes like proven backtest)
+    // Check signal spacing (15 minutes for improved 0-DTE responsiveness)
     const currentTimeMs = currentTime.getTime();
     const minutesSinceLastSignal = (currentTimeMs - this.lastSignalTime) / (1000 * 60);
     
-    if (minutesSinceLastSignal < 30 && this.lastSignalTime > 0) {
+    if (minutesSinceLastSignal < 15 && this.lastSignalTime > 0) {
       return null;
     }
     
