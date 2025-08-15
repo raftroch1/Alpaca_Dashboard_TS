@@ -516,11 +516,11 @@ export class AlpacaPaperTradingEngine {
       this.dailyTradesGenerated = 0;
     }
     
-    // Check signal spacing (30 minutes like proven backtest)
+    // Check signal spacing (15 minutes for improved 0-DTE responsiveness)
     const currentTimeMs = currentTime.getTime();
     const minutesSinceLastSignal = (currentTimeMs - this.lastSignalTime) / (1000 * 60);
     
-    if (minutesSinceLastSignal < 30 && this.lastSignalTime > 0) {
+    if (minutesSinceLastSignal < 15 && this.lastSignalTime > 0) {
       return null;
     }
     
@@ -912,16 +912,42 @@ export class AlpacaPaperTradingEngine {
   private async checkTradeExits(currentBar: MarketData): Promise<void> {
     
     try {
+      // Filter out expired 0-DTE options first
+      const today = new Date();
+      const todayString = `${today.getFullYear().toString().slice(-2)}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+      
+      // Remove expired trades from tracking
+      const initialTradeCount = this.activeTrades.length;
+      this.activeTrades = this.activeTrades.filter(trade => {
+        if (trade.status !== 'FILLED') return true; // Keep non-filled trades
+        
+        // Check if option symbol contains today's date (0-DTE options expire same day)
+        const isExpiredOption = trade.symbol.includes('SPY') && !trade.symbol.includes(todayString);
+        
+        if (isExpiredOption) {
+          console.log(`🗑️ Removing expired 0-DTE option from tracking: ${trade.symbol}`);
+          return false; // Remove expired trades
+        }
+        return true; // Keep current trades
+      });
+      
+      if (this.activeTrades.length < initialTradeCount) {
+        console.log(`✅ Cleaned up ${initialTradeCount - this.activeTrades.length} expired positions`);
+      }
+      
       // Get current option prices from Alpaca (REAL PRICES)
       const currentStockPrice = currentBar.close;
       
-      console.log(`🔍 Checking exits for ${this.activeTrades.filter(t => t.status === 'FILLED').length} filled trades`);
-      console.log(`📊 Current SPY Price: $${currentStockPrice.toFixed(2)}`);
+      const filledTrades = this.activeTrades.filter(t => t.status === 'FILLED');
+      if (filledTrades.length > 0) {
+        console.log(`🔍 Checking exits for ${filledTrades.length} active filled trades`);
+        console.log(`📊 Current SPY Price: $${currentStockPrice.toFixed(2)}`);
+      }
       
       // Get current positions from Alpaca to get REAL option values
       const positions = await this.alpaca.getPositions();
       
-      for (const trade of this.activeTrades.filter(t => t.status === 'FILLED')) {
+      for (const trade of filledTrades) {
         if (!trade.fillPrice || !trade.initialStopLoss) continue;
         
         // Find the actual position in Alpaca to get REAL current value
