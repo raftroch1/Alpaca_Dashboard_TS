@@ -387,10 +387,10 @@ export class AlpacaPaperTradingEngine {
       
       this.isRunning = true;
       
-      // Start monitoring loop (every minute)
+      // Start monitoring loop (every 10 seconds for fast 0-DTE exit monitoring)
       this.monitoringInterval = setInterval(() => {
         this.processAlpacaTrading();
-      }, 60000);
+      }, 10000);
       
       // Initial processing
       await this.processAlpacaTrading();
@@ -475,7 +475,7 @@ export class AlpacaPaperTradingEngine {
       // Update daily tracking
       this.updateDailyTracking(currentBar);
       
-      // Check and update existing positions
+      // Check and update existing positions (critical for 0-DTE stop losses)
       await this.manageAlpacaPositions(currentBar);
       
       // Generate new signals using ENHANCED APPROACH
@@ -853,6 +853,10 @@ export class AlpacaPaperTradingEngine {
           trade.fillTime = new Date(order.filled_at);
           trade.entryPrice = trade.fillPrice;
           
+          // CRITICAL: Calculate stop loss price based on fill price (35% loss)
+          trade.initialStopLoss = trade.fillPrice * (1 - this.INITIAL_STOP_LOSS_PCT);
+          trade.trailingStopPrice = trade.initialStopLoss;
+          
           console.log('');
           console.log('✅ ALPACA ORDER FILLED');
           console.log('======================');
@@ -860,6 +864,10 @@ export class AlpacaPaperTradingEngine {
           console.log(`💰 Fill Price: $${trade.fillPrice.toFixed(2)}`);
           console.log(`🕐 Fill Time: ${trade.fillTime?.toLocaleTimeString()}`);
           console.log('');
+          console.log(`🛡️  Exit thresholds set:`);
+          console.log(`   📉 Stop Loss: $${trade.initialStopLoss.toFixed(2)} (-${(this.INITIAL_STOP_LOSS_PCT * 100).toFixed(0)}%)`);
+          console.log(`   📈 Profit Target: $${(trade.fillPrice * (1 + this.PROFIT_TARGET_PCT)).toFixed(2)} (+${(this.PROFIT_TARGET_PCT * 100).toFixed(0)}%)`);
+          console.log(`   ⏰ Time Exit: 3:30 PM (0-DTE protection)`);
           
           // Set up exit thresholds (not orders)
           await this.setupExitOrders(trade);
@@ -940,7 +948,8 @@ export class AlpacaPaperTradingEngine {
       
       const filledTrades = this.activeTrades.filter(t => t.status === 'FILLED');
       if (filledTrades.length > 0) {
-        console.log(`🔍 Checking exits for ${filledTrades.length} active filled trades`);
+        const now = new Date();
+        console.log(`🔍 [${now.toLocaleTimeString()}] Checking exits for ${filledTrades.length} active filled trades`);
         console.log(`📊 Current SPY Price: $${currentStockPrice.toFixed(2)}`);
       }
       
@@ -980,23 +989,23 @@ export class AlpacaPaperTradingEngine {
         }
         
         const profitPct = (currentValue - trade.fillPrice) / trade.fillPrice;
-        const lossPct = (trade.fillPrice - currentValue) / trade.fillPrice;
+        const absoluteLossPct = Math.abs(Math.min(0, profitPct)); // Absolute loss percentage
         
         console.log(`🔍 ${trade.symbol} (${trade.action}):`);
         console.log(`   💰 Entry: $${trade.fillPrice.toFixed(2)} → Current: $${currentValue.toFixed(2)}`);
         console.log(`   📊 P&L: ${profitPct >= 0 ? '+' : ''}${(profitPct * 100).toFixed(1)}%`);
-        console.log(`   🛡️  Stop Loss: $${trade.initialStopLoss.toFixed(2)}`);
+        console.log(`   🛡️  Stop Loss: $${trade.initialStopLoss.toFixed(2)} (-${(this.INITIAL_STOP_LOSS_PCT * 100).toFixed(0)}%)`);
         
-        // Check for profit target (60%)
+        // Check for profit target (50%)
         if (profitPct >= this.PROFIT_TARGET_PCT) {
           console.log(`🎯 PROFIT TARGET HIT: ${(profitPct * 100).toFixed(1)}% >= ${(this.PROFIT_TARGET_PCT * 100).toFixed(0)}%`);
           await this.closeTradeManually(trade, currentValue, 'PROFIT_TARGET');
           continue;
         }
         
-        // Check for stop loss (30% or hit stop price)
-        if (lossPct >= this.INITIAL_STOP_LOSS_PCT || currentValue <= trade.initialStopLoss!) {
-          console.log(`🛑 STOP LOSS TRIGGERED: ${(lossPct * 100).toFixed(1)}% loss >= ${(this.INITIAL_STOP_LOSS_PCT * 100).toFixed(0)}%`);
+        // Check for stop loss (35% loss OR hit stop price)
+        if (absoluteLossPct >= this.INITIAL_STOP_LOSS_PCT || currentValue <= trade.initialStopLoss!) {
+          console.log(`🛑 STOP LOSS TRIGGERED: ${(absoluteLossPct * 100).toFixed(1)}% loss >= ${(this.INITIAL_STOP_LOSS_PCT * 100).toFixed(0)}%`);
           await this.closeTradeManually(trade, currentValue, 'STOP_LOSS');
           continue;
         }
@@ -1494,7 +1503,7 @@ export class AlpacaPaperTradingEngine {
         client_order_id: `enhanced-${Date.now()}`
       });
       
-      // Track the trade internally
+      // Track the trade internally with proper stop loss calculation
       const trade: AlpacaTrade = {
         id: `trade-${Date.now()}`,
         orderId: order.id,
@@ -1506,7 +1515,9 @@ export class AlpacaPaperTradingEngine {
         entryPrice: 0, // Will be updated when filled
         quantity,
         signalType: signal.signalType,
-        status: 'SUBMITTED'
+        status: 'SUBMITTED',
+        initialStopLoss: 0, // Will be calculated when filled
+        trailingStopPrice: 0 // Will be set when filled
       };
       
       this.activeTrades.push(trade);
