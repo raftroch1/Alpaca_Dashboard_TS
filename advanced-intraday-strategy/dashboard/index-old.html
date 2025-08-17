@@ -24,8 +24,10 @@
     <!-- Main Dashboard Container -->
     <div class="dashboard-container">
         
-        <!-- Control Panels Row -->
-        <div class="control-panels">
+        <!-- BASIC TAB -->
+        <div id="basic-tab" class="tab-content active">
+            <!-- Control Panels Row -->
+            <div class="control-panels">
             
             <!-- Trading Targets Panel -->
             <div class="panel">
@@ -238,169 +240,14 @@
                             <option value="true">Active (15min → 7.5min)</option>
                         </select>
                         <span class="parameter-info">For trending markets</span>
-                                    </div>
-            </div>
-        </div>
-        </div>
-
-        <!-- ADVANCED CONTROLS (Expandable) -->
-        <div class="advanced-controls-section">
-            <div class="advanced-toggle-header">
-                <button class="advanced-toggle-btn" id="advancedToggleBtn">
-                    <span class="toggle-icon">▼</span>
-                    <span>🏛️ Advanced Institutional Controls</span>
-                </button>
-            </div>
-            
-            <div class="advanced-controls-content" id="advancedControlsContent" style="display: none;">
-                <div class="advanced-presets">
-                    <div class="preset-buttons">
-                        <button class="preset-btn" data-preset="conservative-adv">Conservative</button>
-                        <button class="preset-btn active" data-preset="balanced-adv">Balanced</button>
-                        <button class="preset-btn" data-preset="aggressive-adv">Aggressive</button>
-                    </div>
-                </div>
-                
-                <div class="advanced-grid">
-                    <!-- Component Weights Column -->
-                    <div class="advanced-column">
-                        <div class="advanced-panel">
-                            <h4>🎯 Component Weights</h4>
-                            <div class="compact-controls">
-                                <div class="control-row">
-                                    <label>GEX Weight</label>
-                                    <input type="range" id="gexWeight" min="0.1" max="0.5" step="0.05" value="0.30">
-                                    <span id="gexWeightValue">0.30</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>AVP Weight</label>
-                                    <input type="range" id="avpWeight" min="0.1" max="0.3" step="0.05" value="0.20">
-                                    <span id="avpWeightValue">0.20</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>AVWAP Weight</label>
-                                    <input type="range" id="avwapWeight" min="0.1" max="0.3" step="0.05" value="0.20">
-                                    <span id="avwapWeightValue">0.20</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>Fractal Weight</label>
-                                    <input type="range" id="fractalWeight" min="0.1" max="0.4" step="0.05" value="0.20">
-                                    <span id="fractalWeightValue">0.20</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>ATR Weight</label>
-                                    <input type="range" id="atrWeight" min="0.05" max="0.2" step="0.05" value="0.10">
-                                    <span id="atrWeightValue">0.10</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Signal Thresholds Column -->
-                    <div class="advanced-column">
-                        <div class="advanced-panel">
-                            <h4>📊 Signal Thresholds</h4>
-                            <div class="compact-controls">
-                                <div class="control-row">
-                                    <label>Bullish Score</label>
-                                    <input type="range" id="minimumBullishScore" min="0.3" max="0.8" step="0.05" value="0.60">
-                                    <span id="minimumBullishScoreValue">0.60</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>Bearish Score</label>
-                                    <input type="range" id="minimumBearishScore" min="0.3" max="0.8" step="0.05" value="0.60">
-                                    <span id="minimumBearishScoreValue">0.60</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>Confluence Min</label>
-                                    <input type="range" id="confluenceMinimumScore" min="0.3" max="0.8" step="0.1" value="0.6">
-                                    <span id="confluenceMinimumScoreValue">0.6</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="advanced-panel">
-                            <h4>🎯 GEX Controls</h4>
-                            <div class="compact-controls">
-                                <div class="control-row">
-                                    <label>GEX Confidence</label>
-                                    <input type="range" id="gexConfidenceThreshold" min="0.2" max="0.8" step="0.1" value="0.5">
-                                    <span id="gexConfidenceThresholdValue">0.5</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>Extreme GEX</label>
-                                    <select id="treatExtremeAsOpportunity">
-                                        <option value="false">Avoid</option>
-                                        <option value="true" selected>Trade</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Risk & Strategy Column -->
-                    <div class="advanced-column">
-                        <div class="advanced-panel">
-                            <h4>⚡ ATR Controls</h4>
-                            <div class="compact-controls">
-                                <div class="control-row">
-                                    <label>ATR Period</label>
-                                    <input type="range" id="atrPeriod" min="10" max="30" step="2" value="14">
-                                    <span id="atrPeriodValue">14</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>Stop Multiplier</label>
-                                    <input type="range" id="customStopMultiplier" min="1.5" max="4.0" step="0.5" value="2.5">
-                                    <span id="customStopMultiplierValue">2.5</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>Size Multiplier</label>
-                                    <input type="range" id="positionSizeMultiplier" min="0.5" max="2.0" step="0.1" value="1.0">
-                                    <span id="positionSizeMultiplierValue">1.0</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="advanced-panel">
-                            <h4>🛡️ Advanced Risk</h4>
-                            <div class="compact-controls">
-                                <div class="control-row">
-                                    <label>Max Correlated</label>
-                                    <input type="range" id="maxCorrelatedPositions" min="1" max="5" step="1" value="2">
-                                    <span id="maxCorrelatedPositionsValue">2</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>Portfolio Heat</label>
-                                    <input type="range" id="portfolioHeatThreshold" min="0.05" max="0.25" step="0.05" value="0.10">
-                                    <span id="portfolioHeatThresholdValue">10%</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>Emergency Stop</label>
-                                    <input type="range" id="emergencyStopLoss" min="-1000" max="-200" step="50" value="-400">
-                                    <span id="emergencyStopLossValue">-$400</span>
-                                </div>
-                                <div class="control-row">
-                                    <label>Counter-Trend</label>
-                                    <select id="allowCounterTrendTrades">
-                                        <option value="false" selected>Off</option>
-                                        <option value="true">On</option>
-                                    </select>
-                                </div>
-                                <div class="control-row">
-                                    <label>Dynamic Mode</label>
-                                    <select id="dynamicThresholds">
-                                        <option value="false" selected>Fixed</option>
-                                        <option value="true">Dynamic</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
+        </div>
         </div>
 
             <!-- Status Display Panel -->
+            <div class="status-panel">
         <div class="status-panel">
             <div class="panel">
                 <div class="panel-header">

@@ -17,6 +17,7 @@ class TradingDashboard {
         this.initializeWebSocket();
         this.bindEvents();
         this.loadPreset('balanced'); // Start with balanced preset
+        this.initializeAdvancedControls(); // Initialize advanced controls with defaults
     }
 
     getDefaultConfig() {
@@ -140,7 +141,11 @@ class TradingDashboard {
         document.querySelectorAll('.preset-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const preset = e.target.dataset.preset;
-                this.loadPreset(preset);
+                if (preset.includes('-adv')) {
+                    this.loadAdvancedPreset(preset);
+                } else {
+                    this.loadPreset(preset);
+                }
             });
         });
 
@@ -177,6 +182,18 @@ class TradingDashboard {
         // Partial profit toggle
         document.getElementById('usePartialProfitTaking').addEventListener('change', () => {
             this.updatePartialProfitControls();
+        });
+
+        // Advanced controls toggle
+        document.getElementById('advancedToggleBtn').addEventListener('click', () => {
+            this.toggleAdvancedControls();
+        });
+
+        // Advanced range inputs - update display values
+        document.querySelectorAll('#advancedControlsContent input[type="range"]').forEach(input => {
+            input.addEventListener('input', (e) => {
+                this.updateRangeDisplay(e.target);
+            });
         });
 
         // Click outside modal to close
@@ -341,6 +358,178 @@ class TradingDashboard {
             this.updatePartialProfitControls();
             this.addLog(`Loaded ${presetName.toUpperCase()} preset`, 'success');
         }
+    }
+
+    toggleAdvancedControls() {
+        const content = document.getElementById('advancedControlsContent');
+        const toggleBtn = document.getElementById('advancedToggleBtn');
+        const isVisible = content.style.display !== 'none';
+        
+        if (isVisible) {
+            content.style.display = 'none';
+            toggleBtn.classList.remove('expanded');
+        } else {
+            content.style.display = 'block';
+            toggleBtn.classList.add('expanded');
+        }
+    }
+
+    updateRangeDisplay(input) {
+        const valueSpan = document.getElementById(input.id + 'Value');
+        if (valueSpan) {
+            let displayValue = input.value;
+            
+            // Format specific values
+            if (input.id === 'portfolioHeatThreshold') {
+                displayValue = (parseFloat(input.value) * 100).toFixed(0) + '%';
+            } else if (input.id === 'emergencyStopLoss') {
+                displayValue = '-$' + Math.abs(input.value);
+            }
+            
+            valueSpan.textContent = displayValue;
+        }
+    }
+
+    getAdvancedDefaults() {
+        return {
+            // Component Weights
+            gexWeight: 0.30,
+            avpWeight: 0.20,
+            avwapWeight: 0.20,
+            fractalWeight: 0.20,
+            atrWeight: 0.10,
+            
+            // Signal Thresholds
+            minimumBullishScore: 0.60,
+            minimumBearishScore: 0.60,
+            confluenceMinimumScore: 0.6,
+            
+            // GEX Controls
+            gexConfidenceThreshold: 0.5,
+            treatExtremeAsOpportunity: true,
+            
+            // ATR Controls
+            atrPeriod: 14,
+            customStopMultiplier: 2.5,
+            positionSizeMultiplier: 1.0,
+            
+            // Advanced Risk
+            maxCorrelatedPositions: 2,
+            portfolioHeatThreshold: 0.10,
+            emergencyStopLoss: -400,
+            allowCounterTrendTrades: false,
+            dynamicThresholds: false
+        };
+    }
+
+    loadAdvancedPreset(presetName) {
+        const presets = {
+            'conservative-adv': {
+                gexWeight: 0.25,
+                avpWeight: 0.25,
+                avwapWeight: 0.25,
+                fractalWeight: 0.15,
+                atrWeight: 0.10,
+                minimumBullishScore: 0.70,
+                minimumBearishScore: 0.70,
+                confluenceMinimumScore: 0.7,
+                gexConfidenceThreshold: 0.6,
+                treatExtremeAsOpportunity: false,
+                atrPeriod: 20,
+                customStopMultiplier: 3.0,
+                positionSizeMultiplier: 0.8,
+                maxCorrelatedPositions: 1,
+                portfolioHeatThreshold: 0.08,
+                emergencyStopLoss: -300,
+                allowCounterTrendTrades: false,
+                dynamicThresholds: false
+            },
+            'balanced-adv': {
+                gexWeight: 0.30,
+                avpWeight: 0.20,
+                avwapWeight: 0.20,
+                fractalWeight: 0.20,
+                atrWeight: 0.10,
+                minimumBullishScore: 0.60,
+                minimumBearishScore: 0.60,
+                confluenceMinimumScore: 0.6,
+                gexConfidenceThreshold: 0.5,
+                treatExtremeAsOpportunity: true,
+                atrPeriod: 14,
+                customStopMultiplier: 2.5,
+                positionSizeMultiplier: 1.0,
+                maxCorrelatedPositions: 2,
+                portfolioHeatThreshold: 0.10,
+                emergencyStopLoss: -400,
+                allowCounterTrendTrades: false,
+                dynamicThresholds: false
+            },
+            'aggressive-adv': {
+                gexWeight: 0.35,
+                avpWeight: 0.15,
+                avwapWeight: 0.15,
+                fractalWeight: 0.25,
+                atrWeight: 0.10,
+                minimumBullishScore: 0.50,
+                minimumBearishScore: 0.50,
+                confluenceMinimumScore: 0.5,
+                gexConfidenceThreshold: 0.4,
+                treatExtremeAsOpportunity: true,
+                atrPeriod: 10,
+                customStopMultiplier: 2.0,
+                positionSizeMultiplier: 1.2,
+                maxCorrelatedPositions: 3,
+                portfolioHeatThreshold: 0.15,
+                emergencyStopLoss: -500,
+                allowCounterTrendTrades: true,
+                dynamicThresholds: true
+            }
+        };
+
+        const preset = presets[presetName];
+        if (preset) {
+            // Update advanced controls
+            Object.keys(preset).forEach(key => {
+                const element = document.getElementById(key);
+                if (element) {
+                    if (element.type === 'checkbox') {
+                        element.checked = preset[key];
+                    } else {
+                        element.value = preset[key];
+                    }
+                    
+                    // Update range display values
+                    if (element.type === 'range') {
+                        this.updateRangeDisplay(element);
+                    }
+                }
+            });
+            
+            this.addLog(`Loaded ${presetName.replace('-adv', '').toUpperCase()} advanced preset`, 'success');
+        }
+    }
+
+    initializeAdvancedControls() {
+        // Load default advanced settings
+        const defaults = this.getAdvancedDefaults();
+        Object.keys(defaults).forEach(key => {
+            const element = document.getElementById(key);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = defaults[key];
+                } else {
+                    element.value = defaults[key];
+                }
+                
+                // Update range display values
+                if (element.type === 'range') {
+                    this.updateRangeDisplay(element);
+                }
+            }
+        });
+        
+        // Load balanced advanced preset by default
+        this.loadAdvancedPreset('balanced-adv');
     }
 
     applyParameters() {
