@@ -5,7 +5,7 @@
  * Tests if our updated system generates naked options trades
  */
 
-import { DashboardBacktestRunner } from './backtest-runner';
+import { DirectInstitutionalBacktestRunner } from './direct-institutional-backtest-runner';
 import { TradingParameters, ParameterPresets } from './trading-parameters';
 
 async function testNakedOptionsBacktest() {
@@ -17,7 +17,7 @@ async function testNakedOptionsBacktest() {
   
   try {
     console.log('🎯 Running 3-day naked options backtest...');
-    const results = await DashboardBacktestRunner.runBacktestWithParameters(
+    const results = await DirectInstitutionalBacktestRunner.runDirectInstitutionalBacktest(
       testParams,
       '15Min',
       3

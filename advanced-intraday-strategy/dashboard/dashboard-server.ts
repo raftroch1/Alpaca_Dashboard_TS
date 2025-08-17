@@ -202,26 +202,16 @@ export class DashboardServer {
 
       console.log(`📅 Backtest Period: ${backtestPeriod.description}`);
       
-      // Import and run REAL backtest engine with dashboard parameters
-      const { DashboardBacktestRunner } = await import('./backtest-runner');
+      // Import and run DIRECT INSTITUTIONAL backtest engine with dashboard parameters
+      const { DirectInstitutionalBacktestRunner } = await import('./direct-institutional-backtest-runner');
       
       let results;
-      if (backtestPeriod.type === 'custom') {
-        // Use custom date range
-        results = await DashboardBacktestRunner.runBacktestWithCustomDates(
-          testParameters,
-          '1Min',
-          backtestPeriod.startDate,
-          backtestPeriod.endDate
-        );
-      } else {
-        // Use days back
-        results = await DashboardBacktestRunner.runBacktestWithParameters(
-          testParameters,
-          '1Min',
-          backtestPeriod.daysBack || 3
-        );
-      }
+      // Always use our proven DirectInstitutionalBacktestRunner
+      results = await DirectInstitutionalBacktestRunner.runDirectInstitutionalBacktest(
+        testParameters,
+        '1Min',
+        backtestPeriod.daysBack || 3
+      );
 
       this.sendToClient(clientId, {
         type: 'BACKTEST_RESULTS',

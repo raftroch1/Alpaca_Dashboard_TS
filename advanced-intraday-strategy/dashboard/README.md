@@ -30,6 +30,44 @@ Both backtest AND paper trading now use the **exact same institutional signal ge
 
 A comprehensive web-based dashboard for managing and controlling your **institutional-grade** options trading strategy in real-time. Adjust parameters, run backtests, and monitor performance without modifying core code.
 
+## 🚨 **ALPACA API TROUBLESHOOTING**
+
+### **HTTP 403 (Forbidden) Error Fix**
+
+If you're getting **HTTP 403 Forbidden** errors when connecting to Alpaca, follow this checklist:
+
+#### **📋 Checklist for Regular Users:**
+1. **Check Headers**: Make sure you provide credentials in these HTTP headers:
+   - `APCA-API-KEY-ID`
+   - `APCA-API-SECRET-KEY`
+
+2. **Validate Credentials**: 
+   - Check your keys on the [Alpaca web UI](https://app.alpaca.markets)
+   - **IMPORTANT**: When you reset your paper account, you need to regenerate your credentials
+
+3. **Verify Host**: Make sure the host is correct:
+   - Historical data: `data.alpaca.markets`
+   - Live streaming: `stream.data.alpaca.markets`
+
+4. **Check Subscription**: 
+   - For recent SIP data (last 15 minutes), you need **Algo Trader Plus** subscription
+   - Free accounts get IEX data only (delayed)
+
+#### **🔧 Common Solutions:**
+- **Regenerate API keys** after any account reset
+- **Upgrade to Algo Trader Plus** for real-time data
+- **Check .env file** format:
+  ```
+  ALPACA_API_KEY=your_key_here
+  ALPACA_API_SECRET=your_secret_here
+  ALPACA_BASE_URL=https://paper-api.alpaca.markets
+  ```
+
+#### **📚 Full Documentation:**
+For complete troubleshooting guide, see: [Alpaca Market Data FAQ](https://docs.alpaca.markets/docs/market-data-faq#why-am-i-getting-http-403-forbidden)
+
+---
+
 ## ✨ Features
 
 ### 🎯 **Real-time Parameter Control**

@@ -5,7 +5,7 @@
  * Tests naked options with more realistic RSI thresholds
  */
 
-import { DashboardBacktestRunner } from './backtest-runner';
+import { DirectInstitutionalBacktestRunner } from './direct-institutional-backtest-runner';
 import { TradingParameters, ParameterPresets } from './trading-parameters';
 
 async function testRealisticNakedOptions() {
@@ -24,7 +24,7 @@ async function testRealisticNakedOptions() {
   
   try {
     console.log('🎯 Running 3-day REALISTIC naked options backtest...');
-    const results = await DashboardBacktestRunner.runBacktestWithParameters(
+    const results = await DirectInstitutionalBacktestRunner.runDirectInstitutionalBacktest(
       testParams,
       '15Min',
       3

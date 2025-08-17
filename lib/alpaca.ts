@@ -1,11 +1,8 @@
 
 import { AlpacaCredentials, MarketData, OptionsChain } from './types';
-
-// Real Alpaca API client
-const Alpaca = require('@alpacahq/alpaca-trade-api');
+import axios from 'axios';
 
 class AlpacaClient {
-  private alpaca: any;
   private credentials: AlpacaCredentials;
   
   constructor() {
@@ -15,23 +12,29 @@ class AlpacaClient {
       baseUrl: process.env.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets'
     };
 
-    // Credentials loaded and configured
+    if (!this.credentials.apiKey || !this.credentials.apiSecret) {
+      throw new Error('Alpaca API credentials not found. Please set ALPACA_API_KEY and ALPACA_API_SECRET in .env file.');
+    }
+  }
 
-    // Initialize Alpaca client
-    this.alpaca = new Alpaca({
-      keyId: this.credentials.apiKey,
-      secretKey: this.credentials.apiSecret,
-      paper: this.credentials.baseUrl.includes('paper'),
-      usePolygon: false,
-    });
+  // Get proper headers for Alpaca API as per documentation
+  private getHeaders() {
+    return {
+      'APCA-API-KEY-ID': this.credentials.apiKey,
+      'APCA-API-SECRET-KEY': this.credentials.apiSecret,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    };
   }
 
   // Test connection
   async testConnection(): Promise<boolean> {
     try {
-      await this.alpaca.getAccount();
+      const response = await axios.get(`${this.credentials.baseUrl}/v2/account`, {
+        headers: this.getHeaders()
+      });
       console.log('✅ Alpaca connection successful');
-      return true;
+      return response.status === 200;
     } catch (error) {
       console.error('❌ Alpaca connection failed:', error);
       return false;
@@ -42,26 +45,31 @@ class AlpacaClient {
     try {
       console.log(`📊 Fetching ${timeframe} market data for ${symbol} from ${startDate.toDateString()} to ${endDate.toDateString()}`);
       
-      const bars = await this.alpaca.getBarsV2(symbol, {
-        start: startDate.toISOString().split('T')[0],
-        end: endDate.toISOString().split('T')[0],
-        timeframe: timeframe,
-        adjustment: 'raw',
+      const response = await axios.get(`https://data.alpaca.markets/v2/stocks/${symbol}/bars`, {
+        headers: this.getHeaders(),
+        params: {
+          start: startDate.toISOString().split('T')[0],
+          end: endDate.toISOString().split('T')[0],
+          timeframe: timeframe,
+          limit: 10000
+        }
       });
 
       const marketData: MarketData[] = [];
       
-      for await (const bar of bars) {
-        marketData.push({
-          id: `${symbol}_${bar.Timestamp}`,
-          symbol: symbol,
-          date: new Date(bar.Timestamp),
-          open: bar.OpenPrice,
-          high: bar.HighPrice,
-          low: bar.LowPrice,
-          close: bar.ClosePrice,
-          volume: BigInt(bar.Volume),
-          createdAt: new Date()
+      if (response.data.bars) {
+        response.data.bars.forEach((bar: any, index: number) => {
+          marketData.push({
+            id: `${symbol}_${bar.t}_${index}`,
+            symbol: symbol,
+            date: new Date(bar.t),
+            open: bar.o,
+            high: bar.h,
+            low: bar.l,
+            close: bar.c,
+            volume: BigInt(Math.floor(bar.v)),
+            createdAt: new Date()
+          });
         });
       }
 

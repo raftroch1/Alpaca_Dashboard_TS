@@ -17,7 +17,7 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env.dashboard') });
 
 import { Strategy, MarketData, OptionsChain } from '../../lib/types';
-import { alpacaClient } from '../../lib/alpaca';
+import { alpacaHTTPClient } from '../../lib/alpaca-http-client';
 import { TechnicalAnalysis } from '../../lib/technical-indicators';
 import { TradingParameters } from './trading-parameters';
 import { AdaptiveStrategySelector } from '../../lib/adaptive-strategy-selector';
@@ -358,7 +358,7 @@ export class DashboardAlpacaTradingEngine {
       const endTime = new Date();
       const startTime = new Date(endTime.getTime() - 60 * 60 * 1000); // 1 hour ago (match main strategy)
       
-      const marketData = await alpacaClient.getMarketData(
+              const marketData = await alpacaHTTPClient.getMarketData(
         this.SYMBOL,
         startTime,
         endTime,
@@ -402,7 +402,7 @@ export class DashboardAlpacaTradingEngine {
       return null;
     }
     
-    console.log(`🏛️ DASH: Using EXACT SAME AdaptiveStrategySelector as institutional backtest`);
+    console.log(`🏛️ DASH: Using DirectInstitutionalIntegration (PROVEN)`);
     
     if (marketData.length < 50) {
       console.log(`⚠️ DASH: Insufficient data - only ${marketData.length} bars (need 50 for institutional signals)`);
@@ -410,40 +410,52 @@ export class DashboardAlpacaTradingEngine {
     }
     
     try {
-      // Create strategy object from dashboard parameters (same as backtest)
-      const strategy: Strategy = this.createStrategyFromParameters();
+      // Get options chain
+      const optionsChain = await alpacaHTTPClient.getOptionsChain('SPY');
       
-      // Get options chain (same as backtest)
-      const optionsChain = await alpacaClient.getOptionsChain('SPY');
-      
-      // 🚀 USE EXACT SAME INSTITUTIONAL SIGNAL GENERATION AS BACKTEST
-      const strategySelection = AdaptiveStrategySelector.generateAdaptiveSignal(
+      // 🚀 USE OUR PROVEN DirectInstitutionalIntegration
+      const DirectInstitutionalIntegration = await import('../../clean-strategy/core/institutional-strategy/direct-institutional-integration');
+      const signal = await DirectInstitutionalIntegration.default.generateDirectSignal(
         marketData,
-        optionsChain,
-        strategy
+        optionsChain
       );
       
-      const signal = strategySelection.signal;
-      
-      if (signal && strategySelection.selectedStrategy !== 'NO_TRADE') {
-        console.log(`🏛️ INSTITUTIONAL SIGNAL: ${strategySelection.selectedStrategy}`);
-        console.log(`📊 Confidence: ${signal.confidence.toFixed(1)}%`);
-        console.log(`🔍 Reasoning: ${strategySelection.reasoning.join(', ')}`);
+      if (signal && signal.action !== 'NO_TRADE') {
         
-        // Convert institutional signal to dashboard format
+        console.log(`🏛️ DIRECT INSTITUTIONAL SIGNAL: ${signal.action}`);
+        console.log(`📊 Confidence: ${(signal.confidence * 100).toFixed(1)}%`);
+        console.log(`🔍 Reasoning: ${signal.reasoning}`);
+        
+        // Map our DirectInstitutional signals to dashboard format
+        let dashboardAction: 'BUY_CALL' | 'BUY_PUT' | 'NO_TRADE';
+        
+        switch (signal.action) {
+          case 'BUY_CALL':
+          case 'SELL_PUT':  // Bullish strategies -> BUY_CALL for dashboard
+            dashboardAction = 'BUY_CALL';
+            break;
+          case 'BUY_PUT':
+          case 'SELL_CALL': // Bearish strategies -> BUY_PUT for dashboard
+            dashboardAction = 'BUY_PUT';
+            break;
+          default:
+            dashboardAction = 'NO_TRADE';
+        }
+
+        // Convert to dashboard format
         return {
-          action: this.convertInstitutionalAction(signal.action),
-          confidence: signal.confidence / 100, // Convert from percentage to decimal
-          reasoning: strategySelection.reasoning,
+          action: dashboardAction,
+          confidence: signal.confidence,
+          reasoning: [signal.reasoning],
           signalType: 'SOPHISTICATED',
           targetProfit: this.parameters.profitTargetPct,
           maxLoss: this.parameters.initialStopLossPct,
-          quality: signal.confidence > 80 ? 'EXCELLENT' : 'GOOD'
+          quality: signal.confidence > 0.8 ? 'EXCELLENT' : 'GOOD'
         };
       }
       
     } catch (error) {
-      console.log('⚠️ Institutional signal generation error, using fallback');
+      console.log('⚠️ Direct institutional signal generation error, using fallback');
       console.error(error);
     }
     
@@ -547,7 +559,7 @@ export class DashboardAlpacaTradingEngine {
         orderId: order.id,
         clientOrderId,
         timestamp: currentBar.date,
-        action: signal.action as 'BUY_CALL' | 'BUY_PUT',
+        action: signal.action,
         symbol: optionSymbol,
         strike,
         entryPrice: estimatedOptionPrice,
