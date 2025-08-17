@@ -223,6 +223,15 @@ export class DirectInstitutionalIntegration {
         entryPrice = (selectedOption.bid + selectedOption.ask) / 2;
         const riskAmount = accountBalance * fullConfig.maxRiskPerTrade;
         positionSize = Math.floor(riskAmount / (entryPrice * 100)); // Options are 100 shares
+        
+        // SAFETY CAPS: Never exceed reasonable position limits
+        const maxPositionValue = accountBalance * 0.05; // 5% of account max
+        const maxContracts = Math.floor(maxPositionValue / (entryPrice * 100));
+        positionSize = Math.min(positionSize, maxContracts);
+        
+        // Absolute bounds: 1-10 contracts maximum
+        positionSize = Math.max(1, Math.min(positionSize, 10));
+        
         maxRisk = positionSize * entryPrice * 100;
       }
     }

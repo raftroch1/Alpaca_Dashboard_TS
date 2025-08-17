@@ -438,14 +438,27 @@ export class EnhancedATRRiskManager {
     const riskAdjustment = (stopMultiplier / config.riskParameters.baseStopMultiplier) * 
                           (config.riskParameters.basePositionSize / positionMultiplier);
     
-    // Calculate absolute values optimized for $300 position targets
+    // Calculate absolute values with SAFE position sizing
     const stopLoss = atr * stopMultiplier;
-    const targetPositionValue = 300; // Target $300 per position
     const maxRisk = accountBalance * (maxRiskPercent / 100);
     
-    // Calculate position size based on target position value and risk limits
-    const basePositionValue = Math.min(targetPositionValue, maxRisk / 0.3); // Assume max 30% loss
-    const positionSize = Math.floor((basePositionValue / 2.5) * positionMultiplier); // Assume ~$2.50 avg option price
+    // SAFE POSITION SIZING: Never risk more than 2% of account per trade
+    // Target position value should be much smaller for options
+    const targetPositionValue = Math.min(500, maxRisk); // Max $500 or 2% of account
+    const avgOptionPrice = 2.50; // Assume ~$2.50 avg option price
+    
+    // Calculate position size: (Target Value / Option Price / 100) * multiplier
+    // Divide by 100 because each option contract = 100 shares
+    const baseContracts = Math.floor(targetPositionValue / (avgOptionPrice * 100));
+    let positionSize = Math.floor(baseContracts * positionMultiplier);
+    
+    // SAFETY CAP: Never exceed 5% of account value in a single position
+    const maxPositionValue = accountBalance * 0.05; // 5% max
+    const maxContracts = Math.floor(maxPositionValue / (avgOptionPrice * 100));
+    positionSize = Math.min(positionSize, maxContracts);
+    
+    // Absolute minimum and maximum bounds
+    positionSize = Math.max(1, Math.min(positionSize, 10)); // 1-10 contracts max
     
     return {
       stopMultiplier,
