@@ -183,6 +183,62 @@ export class ParameterPresets {
     }
   };
 
+  static readonly SENSITIVE: TradingPreset = {
+    name: "Sensitive",
+    description: "More sensitive to trade opportunities - for testing signals",
+    parameters: {
+      dailyPnLTarget: 150,
+      targetWinSize: 150,
+      targetLossSize: 100,
+      dailyTradeTarget: null,
+      
+      initialStopLossPct: 0.30,
+      profitTargetPct: 0.45,
+      trailActivationPct: 0.15,
+      trailStopPct: 0.08,
+      maxDrawdownPct: 0.12,
+      
+      minSignalSpacingMinutes: 5,
+      forceExitTime: 15.5,
+      maxHoldMinutesMorning: 75,
+      maxHoldMinutesAfternoon: 50,
+      
+      rsiOversold: 30,
+      rsiOverbought: 70,
+      rsiPeriod: 14,
+      momentumThresholdPct: 0.10,
+      volumeConfirmationRatio: 1.2,
+      breakoutThresholdPct: 0.06,
+      
+      basePositionValue: 400,
+      maxRiskPerTradePct: 0.015,
+      accountSize: 25000,
+      maxConcurrentPositions: 3,
+      
+      enableRsiSignals: true,
+      enableMomentumSignals: true,
+      enableBreakoutSignals: true,
+      enableTimeBasedSignals: true,
+      
+      usePartialProfitTaking: false,
+      partialProfitLevel: 0.25,
+      partialProfitSize: 0.50,
+      moveStopToBreakeven: false,
+      reducedSignalSpacing: false,
+      
+      // Institutional features - more sensitive settings
+      enableGEXFilters: true,
+      enableVolumeProfile: true,
+      enableMicrofractals: true,
+      enableATRRiskManagement: true,
+      requireConfluence: false, // Don't require confluence for more signals
+      minConfidenceLevel: 0.35, // Much lower confidence threshold
+      enableGreeksMonitoring: true,
+      portfolioRiskLimit: 8.0,
+      dailyLossLimit: 400
+    }
+  };
+
   static readonly AGGRESSIVE: TradingPreset = {
     name: "Aggressive",
     description: "Higher targets, more frequent trading - for trending markets",
@@ -240,13 +296,14 @@ export class ParameterPresets {
   };
 
   static getAllPresets(): TradingPreset[] {
-    return [this.CONSERVATIVE, this.BALANCED, this.AGGRESSIVE];
+    return [this.CONSERVATIVE, this.BALANCED, this.SENSITIVE, this.AGGRESSIVE];
   }
 
   static getPreset(name: string): TradingPreset | null {
     switch (name.toLowerCase()) {
       case 'conservative': return this.CONSERVATIVE;
       case 'balanced': return this.BALANCED;
+      case 'sensitive': return this.SENSITIVE;
       case 'aggressive': return this.AGGRESSIVE;
       default: return null;
     }

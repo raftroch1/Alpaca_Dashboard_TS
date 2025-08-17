@@ -53,12 +53,43 @@ export class DirectInstitutionalBacktestRunner {
     console.log('');
 
     try {
-      // Generate comprehensive mock market data
-      const marketData = this.generateRealisticMarketData(daysBack, timeframe);
-      const optionsChain = this.generateMockOptionsChain();
+      // Use REAL Alpaca historical data instead of mock data
+      const { alpacaClient } = await import('../../lib/alpaca');
       
-      console.log(`📊 Generated ${marketData.length} bars of market data`);
-      console.log(`📋 Generated ${optionsChain.length} options contracts`);
+      // Calculate date range for real data
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - daysBack);
+      
+      console.log(`📊 Fetching REAL Alpaca data from ${startDate.toDateString()} to ${endDate.toDateString()}`);
+      
+      // Fetch ONLY real market data from Alpaca (NO MOCK DATA FALLBACK)
+      let marketData;
+      try {
+        marketData = await alpacaClient.getMarketData('SPY', startDate, endDate, timeframe);
+        
+        if (marketData.length < 10) {
+          throw new Error(`Insufficient real data: only ${marketData.length} bars retrieved. Minimum 10 required.`);
+        }
+        
+        console.log('✅ Successfully retrieved REAL Alpaca market data');
+        
+      } catch (alpacaError) {
+        console.error('❌ REAL DATA FETCH FAILED:', alpacaError);
+        console.error('🚫 Mock data is DISABLED. Please check:');
+        console.error('   1. Alpaca API credentials are correct');
+        console.error('   2. Internet connection is working');
+        console.error('   3. Date range has market data available');
+        throw new Error(`Real Alpaca data fetch failed: ${alpacaError}. Mock data disabled by user request.`);
+      }
+      
+      // Generate options chain based on REAL market price
+      const currentPrice = marketData[marketData.length - 1].close;
+      const optionsChain = this.generateMockOptionsChain(currentPrice);
+      
+      console.log(`📊 Using ${marketData.length} bars of REAL ALPACA market data (SPY: $${currentPrice.toFixed(2)})`);
+      console.log(`📋 Generated ${optionsChain.length} options contracts based on real price`);
+      console.log(`📅 Data range: ${marketData[0].date.toDateString()} to ${marketData[marketData.length - 1].date.toDateString()}`);
       console.log('');
       
       // Track signals by type
@@ -81,10 +112,13 @@ export class DirectInstitutionalBacktestRunner {
         const currentData = marketData.slice(0, i + 1);
         
         try {
-          // Use our proven DirectInstitutionalIntegration
+          // Use our proven DirectInstitutionalIntegration with RELAXED config for real data
+          const { RELAXED_TRADING_CONFIG } = await import('../../clean-strategy/core/institutional-strategy/relaxed-coherent-config');
+          
           const signal = await DirectInstitutionalIntegration.generateDirectSignal(
             currentData,
-            optionsChain
+            optionsChain,
+            RELAXED_TRADING_CONFIG  // Use relaxed thresholds (0.5 vs 0.7 confluence)
           );
           
           if (signal && signal.action !== 'NO_TRADE') {
@@ -153,48 +187,73 @@ export class DirectInstitutionalBacktestRunner {
   }
   
   /**
-   * Generate realistic market data for testing
+   * DISABLED: Generate realistic market data for testing
+   * 
+   * NOTE: Mock data generation is COMMENTED OUT per user request.
+   * Only real Alpaca data should be used for backtests.
+   * This method is preserved for reference only.
    */
+  /* DISABLED - MOCK DATA NOT ALLOWED
   private static generateRealisticMarketData(daysBack: number, timeframe: string): any[] {
     const data = [];
     const barsPerDay = timeframe === '1Min' ? 390 : timeframe === '5Min' ? 78 : 26; // Market hours
     const totalBars = daysBack * barsPerDay;
     
-    let basePrice = 480;
+    // Use realistic SPY price range (current market levels)
+    const basePrice = 480; // Starting price
+    const minPrice = 420;  // Realistic floor
+    const maxPrice = 580;  // Realistic ceiling (prevents $700+ drift)
     const now = new Date();
     
     for (let i = 0; i < totalBars; i++) {
       const timestamp = new Date(now.getTime() - (totalBars - i) * 60000);
       
-      // Add realistic price movement
-      const trend = Math.sin(i / 50) * 2; // Longer trend
-      const noise = (Math.random() - 0.5) * 1; // Random noise
-      const price = basePrice + trend + noise;
+      // Create bounded price movement that won't drift to unrealistic levels
+      const dayProgress = (i % barsPerDay) / barsPerDay; // Progress through trading day
+      const overallProgress = i / totalBars; // Progress through entire period
+      
+      // Daily pattern (higher volatility at open/close)
+      const dailyVolatility = Math.sin(dayProgress * Math.PI) * 0.5 + 0.3;
+      
+      // Longer-term trend with bounds
+      const longTrend = Math.sin(overallProgress * Math.PI * 4) * 15; // ±15 point range
+      
+      // Short-term noise
+      const noise = (Math.random() - 0.5) * dailyVolatility;
+      
+      // Calculate price with bounds (NO CUMULATIVE DRIFT)
+      let price = basePrice + longTrend + noise;
+      
+      // Enforce realistic SPY bounds (prevents $700+ prices)
+      price = Math.max(minPrice, Math.min(maxPrice, price));
+      
+      const spread = price * 0.001; // 0.1% spread
       
       data.push({
         id: `spy-${i}`,
         symbol: 'SPY',
         date: timestamp,
-        open: price - 0.1,
-        high: price + 0.3,
-        low: price - 0.3,
+        open: price - spread/2,
+        high: price + spread,
+        low: price - spread,
         close: price,
         volume: BigInt(Math.floor(1000000 + Math.random() * 500000)),
         createdAt: timestamp
       });
       
-      basePrice = price; // Price continuity
+      // REMOVED: basePrice = price; (this caused cumulative drift to $700+)
     }
     
     return data;
   }
+  */ // END DISABLED MOCK DATA METHOD
   
   /**
-   * Generate mock options chain
+   * Generate mock options chain based on current market price
    */
-  private static generateMockOptionsChain(): any[] {
+  private static generateMockOptionsChain(currentPrice: number = 480): any[] {
     const chain = [];
-    const basePrice = 480;
+    const basePrice = currentPrice;
     
     // Generate strikes around current price
     for (let strike = basePrice - 10; strike <= basePrice + 10; strike += 1) {

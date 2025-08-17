@@ -79,8 +79,8 @@ export class DirectInstitutionalIntegration {
     fractalWeight: 0.20,
     atrWeight: 0.10,
     
-    minimumBullishScore: 0.6,
-    minimumBearishScore: 0.6,
+    minimumBullishScore: 0.35, // Lowered from 0.6 to allow more trades
+    minimumBearishScore: 0.35, // Lowered from 0.6 to allow more trades
     
     maxPositionSize: 0.05, // 5% of account
     maxRiskPerTrade: 0.02, // 2% max risk
@@ -297,11 +297,31 @@ export class DirectInstitutionalIntegration {
   }
   
   private static scoreAVP(avp: AVPSnapshot, currentPrice: number): number {
-    if (!avp.volumeNodes || avp.volumeNodes.length === 0) return 0;
+    if (!avp.volumeNodes || avp.volumeNodes.length === 0) {
+      // Give small base score if we have volume profile data but no clear nodes
+      return avp.pocPrice ? 0.1 : 0;
+    }
     
     // Find nearest HVN (High Volume Node) for support/resistance
     const hvns = avp.volumeNodes.filter(node => node.classification === 'HVN');
-    if (hvns.length === 0) return 0;
+    
+    if (hvns.length === 0) {
+      // No HVNs found, but check position relative to POC and Value Area
+      let score = 0.1; // Base score for having volume profile data
+      
+      if (avp.pocPrice) {
+        const pocDistance = Math.abs(avp.pocPrice - currentPrice) / currentPrice;
+        if (pocDistance < 0.002) score += 0.2; // Near POC
+      }
+      
+      if (avp.valueAreaHigh && avp.valueAreaLow) {
+        if (currentPrice >= avp.valueAreaLow && currentPrice <= avp.valueAreaHigh) {
+          score += 0.2; // Inside value area
+        }
+      }
+      
+      return Math.min(score, 0.4);
+    }
     
     const nearestHVN = hvns.reduce((closest, node) => 
       Math.abs(node.priceLevel - currentPrice) < Math.abs(closest.priceLevel - currentPrice) 
@@ -320,17 +340,19 @@ export class DirectInstitutionalIntegration {
     
     let score = 0;
     
-    // Trend direction scoring
-    switch (avwap.trendDirection) {
-      case 'BULLISH':
-        score = 0.6;
-        break;
-      case 'NEUTRAL':
-        score = 0;
-        break;
-      case 'BEARISH':
-        score = -0.6;
-        break;
+    // More sensitive trend direction scoring
+    const trendStr = avwap.trendDirection.toString();
+    if (trendStr.includes('BULLISH')) {
+      score = 0.6;
+    } else if (trendStr.includes('BEARISH')) {
+      score = -0.6;
+    } else if (trendStr.includes('NEUTRAL')) {
+      // Give some credit for neutral positioning near VWAP
+      if (trendStr.includes('WEAK')) {
+        score = 0.2; // Small positive score for weak neutral (potential breakout)
+      } else {
+        score = 0.1; // Minimal score for pure neutral
+      }
     }
     
     return score;
