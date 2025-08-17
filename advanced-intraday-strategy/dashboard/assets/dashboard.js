@@ -169,6 +169,11 @@ class TradingDashboard {
             this.closeModal();
         });
 
+        // Backtest period selector
+        document.getElementById('backtestPeriod').addEventListener('change', (e) => {
+            this.handlePeriodChange(e.target.value);
+        });
+
         // Partial profit toggle
         document.getElementById('usePartialProfitTaking').addEventListener('change', () => {
             this.updatePartialProfitControls();
@@ -352,20 +357,85 @@ class TradingDashboard {
         }
     }
 
+    handlePeriodChange(period) {
+        const customDateRange = document.getElementById('customDateRange');
+        const customEndDate = document.getElementById('customEndDate');
+        
+        if (period === 'custom') {
+            customDateRange.style.display = 'block';
+            customEndDate.style.display = 'block';
+            
+            // Set default dates
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setMonth(startDate.getMonth() - 1); // Default to 1 month back
+            
+            document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+            document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+        } else {
+            customDateRange.style.display = 'none';
+            customEndDate.style.display = 'none';
+        }
+    }
+
+    getBacktestPeriodInfo() {
+        const periodSelect = document.getElementById('backtestPeriod').value;
+        
+        if (periodSelect === 'custom') {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            
+            if (!startDate || !endDate) {
+                throw new Error('Please select both start and end dates for custom range');
+            }
+            
+            return {
+                type: 'custom',
+                startDate: startDate,
+                endDate: endDate,
+                description: `${startDate} to ${endDate}`
+            };
+        } else {
+            // Calculate days back based on period
+            const periodMap = {
+                '3days': { daysBack: 3, description: 'Last 3 Days' },
+                '1week': { daysBack: 7, description: 'Last 1 Week' },
+                '2weeks': { daysBack: 14, description: 'Last 2 Weeks' },
+                '1month': { daysBack: 30, description: 'Last 1 Month' },
+                '3months': { daysBack: 90, description: 'Last 3 Months' },
+                '6months': { daysBack: 180, description: 'Last 6 Months' }
+            };
+            
+            const periodInfo = periodMap[periodSelect] || periodMap['3days'];
+            return {
+                type: 'daysBack',
+                daysBack: periodInfo.daysBack,
+                description: periodInfo.description
+            };
+        }
+    }
+
     runBacktest() {
         const config = this.gatherCurrentConfig();
         
-        if (this.isConnected) {
-            this.showModal();
-            this.showBacktestLoading();
+        try {
+            const periodInfo = this.getBacktestPeriodInfo();
+            config.backtestPeriod = periodInfo;
             
-            this.sendMessage({
-                type: 'RUN_BACKTEST',
-                config: config
-            });
-            this.addLog('Starting backtest with current parameters...', 'info');
-        } else {
-            this.addLog('Not connected to trading engine', 'error');
+            if (this.isConnected) {
+                this.showModal();
+                this.showBacktestLoading();
+                
+                this.sendMessage({
+                    type: 'RUN_BACKTEST',
+                    config: config
+                });
+                this.addLog(`Starting backtest for ${periodInfo.description}...`, 'info');
+            } else {
+                this.addLog('Not connected to trading engine', 'error');
+            }
+        } catch (error) {
+            this.addLog(`Backtest error: ${error.message}`, 'error');
         }
     }
 

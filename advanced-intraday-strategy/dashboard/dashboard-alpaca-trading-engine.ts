@@ -136,7 +136,18 @@ export class DashboardAlpacaTradingEngine {
       partialProfitLevel: 0.30,
       partialProfitSize: 0.50,
       moveStopToBreakeven: false,
-      reducedSignalSpacing: false
+      reducedSignalSpacing: false,
+      
+      // Institutional features (default values)
+      enableGEXFilters: true,
+      enableVolumeProfile: true,
+      enableMicrofractals: true,
+      enableATRRiskManagement: true,
+      requireConfluence: true,
+      minConfidenceLevel: 0.6,
+      enableGreeksMonitoring: true,
+      portfolioRiskLimit: 10.0,
+      dailyLossLimit: 500
     };
   }
 
@@ -194,6 +205,22 @@ export class DashboardAlpacaTradingEngine {
         
         async cancelOrder(orderId: string) {
           const response = await axios.delete(`${this.baseUrl}/v2/orders/${orderId}`, { 
+            headers: this.headers 
+          });
+          return response.data;
+        },
+        
+        // MISSING METHOD: createOrder (same as main strategy)
+        async createOrder(orderData: any) {
+          const response = await axios.post(`${this.baseUrl}/v2/orders`, orderData, { 
+            headers: this.headers 
+          });
+          return response.data;
+        },
+        
+        // MISSING METHOD: getPositions (same as main strategy)
+        async getPositions() {
+          const response = await axios.get(`${this.baseUrl}/v2/positions`, { 
             headers: this.headers 
           });
           return response.data;
@@ -275,7 +302,7 @@ export class DashboardAlpacaTradingEngine {
   private startMonitoringLoop(): void {
     console.log('📡 Starting dashboard monitoring loop...');
     
-    // Start monitoring loop (every minute)
+    // Start monitoring loop (every 10 seconds for fast 0-DTE exit monitoring)
     this.monitoringInterval = setInterval(async () => {
       if (!this.isRunning) return;
       
@@ -300,7 +327,7 @@ export class DashboardAlpacaTradingEngine {
         // Update daily tracking
         this.updateDailyTracking(currentBar);
         
-        // Manage existing positions
+        // Manage existing positions (critical for 0-DTE stop losses)
         await this.manageDashboardPositions(currentBar);
         
         // Generate new signals
@@ -322,7 +349,7 @@ export class DashboardAlpacaTradingEngine {
         console.error('❌ Dashboard monitoring error:', error);
       }
       
-    }, 60000); // Every minute
+    }, 10000); // Every 10 seconds
   }
 
   private async getCurrentMarketData(): Promise<MarketData[]> {
@@ -378,10 +405,23 @@ export class DashboardAlpacaTradingEngine {
     const closes = marketData.map(bar => bar.close);
     const volumes = marketData.map(bar => Number(bar.volume || 0));
     
-    if (closes.length < 20) return null; // Need enough data
+    if (closes.length < 20) {
+      console.log(`⚠️ DASH: Insufficient data - only ${closes.length} bars (need 20)`);
+      return null;
+    }
     
     const rsi = TechnicalAnalysis.calculateRSI(marketData, this.parameters.rsiPeriod);
     const currentRSI = rsi[rsi.length - 1];
+    
+    // DEBUG: Log current conditions every few checks
+    const now = new Date();
+    if (now.getMinutes() % 5 === 0 && now.getSeconds() < 15) {
+      console.log(`🔍 DASH Signal Check [${now.toLocaleTimeString()}]:`);
+      console.log(`   📊 RSI: ${currentRSI.toFixed(1)} (need <${this.parameters.rsiOversold} or >${this.parameters.rsiOverbought})`);
+      console.log(`   📈 Current Price: $${currentBar.close.toFixed(2)}`);
+      console.log(`   🔢 Data Bars: ${closes.length}`);
+      console.log(`   📊 Volume: ${Number(currentBar.volume || 0).toLocaleString()}`);
+    }
     
     // RSI Signals (using dashboard parameters)
     if (this.parameters.enableRsiSignals && currentRSI < this.parameters.rsiOversold) {
@@ -389,7 +429,11 @@ export class DashboardAlpacaTradingEngine {
       const avgVolume = volumes.slice(-20).reduce((sum, vol) => sum + vol, 0) / 20;
       const volumeRatio = Number(currentBar.volume || 0) / avgVolume;
       
+      console.log(`🔥 DASH RSI OVERSOLD DETECTED: ${currentRSI.toFixed(1)} < ${this.parameters.rsiOversold}`);
+      console.log(`   📋 Volume Ratio: ${volumeRatio.toFixed(2)}x (need ${this.parameters.volumeConfirmationRatio}x)`);
+      
       if (volumeRatio >= this.parameters.volumeConfirmationRatio) {
+        console.log(`✅ DASH CALL SIGNAL GENERATED!`);
         return {
           action: 'BUY_CALL',
           confidence: Math.min(0.80, 0.60 + Math.abs(priceChange) * 0.05),
@@ -411,7 +455,11 @@ export class DashboardAlpacaTradingEngine {
       const avgVolume = volumes.slice(-20).reduce((sum, vol) => sum + vol, 0) / 20;
       const volumeRatio = Number(currentBar.volume || 0) / avgVolume;
       
+      console.log(`🔥 DASH RSI OVERBOUGHT DETECTED: ${currentRSI.toFixed(1)} > ${this.parameters.rsiOverbought}`);
+      console.log(`   📋 Volume Ratio: ${volumeRatio.toFixed(2)}x (need ${this.parameters.volumeConfirmationRatio}x)`);
+      
       if (volumeRatio >= this.parameters.volumeConfirmationRatio) {
+        console.log(`✅ DASH PUT SIGNAL GENERATED!`);
         return {
           action: 'BUY_PUT',
           confidence: Math.min(0.80, 0.60 + Math.abs(priceChange) * 0.05),
@@ -517,11 +565,16 @@ export class DashboardAlpacaTradingEngine {
     // Update order statuses with real Alpaca data
     await this.updateDashboardOrderStatuses();
     
+    const filledTrades = this.activeTrades.filter(t => t.status === 'FILLED');
+    if (filledTrades.length > 0) {
+      const now = new Date();
+      console.log(`🔍 [${now.toLocaleTimeString()}] Dashboard checking exits for ${filledTrades.length} active trades`);
+      console.log(`📊 Current SPY Price: $${currentBar.close.toFixed(2)}`);
+    }
+    
     // Position management with dashboard parameters
-    for (const trade of this.activeTrades) {
-      if (trade.status === 'FILLED') {
-        await this.checkDashboardTradeExits(trade, currentBar);
-      }
+    for (const trade of filledTrades) {
+      await this.checkDashboardTradeExits(trade, currentBar);
     }
   }
 
@@ -539,7 +592,13 @@ export class DashboardAlpacaTradingEngine {
                 trade.status = 'FILLED';
                 trade.fillPrice = parseFloat(order.filled_avg_price || '0');
                 trade.fillTime = new Date(order.filled_at);
+                
+                // CRITICAL: Calculate stop loss price based on fill price (dashboard parameters)
+                trade.initialStopLoss = trade.fillPrice * (1 - this.parameters.initialStopLossPct);
+                trade.trailingStopPrice = trade.initialStopLoss;
+                
                 console.log(`✅ DASH Order Filled: ${trade.action} ${trade.quantity} contracts at $${trade.fillPrice}`);
+                console.log(`🛡️  DASH Stop Loss Set: $${trade.initialStopLoss.toFixed(2)} (-${(this.parameters.initialStopLossPct * 100).toFixed(0)}%)`);
               } else if (order.status === 'canceled' || order.status === 'cancelled') {
                 trade.status = 'CANCELLED';
                 console.log(`❌ DASH Order Cancelled: ${trade.clientOrderId}`);
@@ -560,23 +619,83 @@ export class DashboardAlpacaTradingEngine {
   }
 
   private async checkDashboardTradeExits(trade: DashboardTrade, currentBar: MarketData): Promise<void> {
-    // Exit logic using dashboard parameters (partial profit taking, etc.)
+    if (!trade.fillPrice || !trade.initialStopLoss) return;
+    
     const currentStockPrice = currentBar.close;
     const holdTimeMinutes = (currentBar.date.getTime() - trade.timestamp.getTime()) / (1000 * 60);
     
-    // Check profit target
-    const profitPct = (currentStockPrice - trade.entryPrice) / trade.entryPrice;
+    // Get real Alpaca option prices (same as main strategy)
+    const positions = await this.alpaca.getPositions();
+    const alpacaPosition = positions.find((pos: any) => pos.symbol === trade.symbol);
     
-    if (this.parameters.usePartialProfitTaking && profitPct >= this.parameters.partialProfitLevel) {
-      console.log(`📈 Dashboard partial profit taking triggered at ${(profitPct * 100).toFixed(1)}%`);
-      // Implement partial exit logic
+    let currentValue;
+    if (alpacaPosition) {
+      // Use REAL Alpaca market value - convert from total position value to per-contract price
+      currentValue = parseFloat(alpacaPosition.market_value) / (trade.quantity * 100);
+      console.log(`📊 DASH REAL Alpaca Price for ${trade.symbol}: $${currentValue.toFixed(2)} (market_value: $${alpacaPosition.market_value})`);
+    } else {
+      // Fallback to estimation if no position found
+      const stockMovePct = (currentStockPrice - trade.strike!) / trade.strike!;
+      
+      if (trade.action === 'BUY_CALL') {
+        if (currentStockPrice > trade.strike!) {
+          currentValue = trade.fillPrice * (1 + Math.abs(stockMovePct) * 3);
+        } else {
+          currentValue = trade.fillPrice * Math.max(0.05, (1 - Math.abs(stockMovePct) * 8));
+        }
+      } else { // BUY_PUT
+        if (currentStockPrice < trade.strike!) {
+          currentValue = trade.fillPrice * (1 + Math.abs(stockMovePct) * 3);
+        } else {
+          currentValue = trade.fillPrice * Math.max(0.05, (1 - Math.abs(stockMovePct) * 8));
+        }
+      }
+      console.log(`📊 DASH ESTIMATED Price for ${trade.symbol}: $${currentValue.toFixed(2)} (no Alpaca position found)`);
     }
     
-    // Standard exit checks with dashboard parameters
+    const profitPct = (currentValue - trade.fillPrice) / trade.fillPrice;
+    const absoluteLossPct = Math.abs(Math.min(0, profitPct));
+    
+    console.log(`🔍 DASH ${trade.symbol} (${trade.action}):`);
+    console.log(`   💰 Entry: $${trade.fillPrice.toFixed(2)} → Current: $${currentValue.toFixed(2)}`);
+    console.log(`   📊 P&L: ${profitPct >= 0 ? '+' : ''}${(profitPct * 100).toFixed(1)}%`);
+    console.log(`   🛡️  Stop Loss: $${trade.initialStopLoss.toFixed(2)} (-${(this.parameters.initialStopLossPct * 100).toFixed(0)}%)`);
+    
+    // Check for profit target
     if (profitPct >= this.parameters.profitTargetPct) {
+      console.log(`🎯 DASH PROFIT TARGET HIT: ${(profitPct * 100).toFixed(1)}% >= ${(this.parameters.profitTargetPct * 100).toFixed(0)}%`);
       await this.exitDashboardTrade(trade, 'PROFIT_TARGET');
-    } else if (profitPct <= -this.parameters.initialStopLossPct) {
+      return;
+    }
+    
+    // Enhanced stop loss logic (same as main strategy)
+    const percentageLossTriggered = absoluteLossPct >= this.parameters.initialStopLossPct;
+    const priceLossTriggered = currentValue <= trade.initialStopLoss;
+    const realLossTriggered = absoluteLossPct >= 0.30; // 30% real loss trigger for 0-DTE protection
+    
+    if (percentageLossTriggered || priceLossTriggered || realLossTriggered) {
+      let triggerReason;
+      if (realLossTriggered && absoluteLossPct < this.parameters.initialStopLossPct) {
+        triggerReason = `30% real loss protection: ${(absoluteLossPct * 100).toFixed(1)}% >= 30%`;
+      } else if (percentageLossTriggered) {
+        triggerReason = `${(absoluteLossPct * 100).toFixed(1)}% loss >= ${(this.parameters.initialStopLossPct * 100).toFixed(0)}%`;
+      } else {
+        triggerReason = `Price $${currentValue.toFixed(2)} <= $${trade.initialStopLoss.toFixed(2)}`;
+      }
+      
+      console.log(`🛑 DASH STOP LOSS TRIGGERED: ${triggerReason}`);
+      console.log(`   📊 Loss Check: ${(absoluteLossPct * 100).toFixed(1)}% vs ${(this.parameters.initialStopLossPct * 100).toFixed(0)}% = ${percentageLossTriggered ? 'TRIGGERED' : 'OK'}`);
+      console.log(`   💰 Price Check: $${currentValue.toFixed(2)} vs $${trade.initialStopLoss.toFixed(2)} = ${priceLossTriggered ? 'TRIGGERED' : 'OK'}`);
+      console.log(`   🔥 Real Loss Check: ${(absoluteLossPct * 100).toFixed(1)}% vs 30% = ${realLossTriggered ? 'TRIGGERED' : 'OK'}`);
+      
       await this.exitDashboardTrade(trade, 'STOP_LOSS');
+      return;
+    }
+    
+    // Partial profit taking logic
+    if (this.parameters.usePartialProfitTaking && profitPct >= this.parameters.partialProfitLevel) {
+      console.log(`📈 DASH partial profit taking triggered at ${(profitPct * 100).toFixed(1)}%`);
+      // TODO: Implement partial exit logic when needed
     }
   }
 

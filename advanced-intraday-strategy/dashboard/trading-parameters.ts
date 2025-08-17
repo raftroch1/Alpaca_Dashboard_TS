@@ -51,6 +51,17 @@ export interface TradingParameters {
   partialProfitSize: number;        // 0.50 (50% of position)
   moveStopToBreakeven: boolean;     // false
   reducedSignalSpacing: boolean;    // false (15 min vs 30 min)
+  
+  // 🏛️ Institutional Features (NEW)
+  enableGEXFilters: boolean;        // true (Gamma Exposure filtering)
+  enableVolumeProfile: boolean;     // true (Anchored Volume Profile)
+  enableMicrofractals: boolean;     // true (Microfractal-Fibonacci)
+  enableATRRiskManagement: boolean; // true (ATR-based position sizing)
+  requireConfluence: boolean;       // true (require multiple signals)
+  minConfidenceLevel: number;       // 0.6 (60% minimum signal confidence)
+  enableGreeksMonitoring: boolean;  // true (real-time Greeks tracking)
+  portfolioRiskLimit: number;       // 10.0 (10% max portfolio risk)
+  dailyLossLimit: number;           // 500 (max daily loss limit)
 }
 
 export interface TradingPreset {
@@ -101,7 +112,18 @@ export class ParameterPresets {
       partialProfitLevel: 0.25,
       partialProfitSize: 0.50,
       moveStopToBreakeven: true,
-      reducedSignalSpacing: false
+      reducedSignalSpacing: false,
+      
+      // Institutional features - conservative settings
+      enableGEXFilters: true,
+      enableVolumeProfile: true,
+      enableMicrofractals: false, // Disabled for conservative
+      enableATRRiskManagement: true,
+      requireConfluence: true,
+      minConfidenceLevel: 0.7, // Higher confidence for conservative
+      enableGreeksMonitoring: true,
+      portfolioRiskLimit: 5.0, // Lower risk for conservative
+      dailyLossLimit: 300
     }
   };
 
@@ -146,7 +168,18 @@ export class ParameterPresets {
       partialProfitLevel: 0.30,
       partialProfitSize: 0.50,
       moveStopToBreakeven: false,
-      reducedSignalSpacing: false
+      reducedSignalSpacing: false,
+      
+      // Institutional features - balanced settings
+      enableGEXFilters: true,
+      enableVolumeProfile: true,
+      enableMicrofractals: true,
+      enableATRRiskManagement: true,
+      requireConfluence: true,
+      minConfidenceLevel: 0.6, // Standard confidence
+      enableGreeksMonitoring: true,
+      portfolioRiskLimit: 10.0, // Standard risk
+      dailyLossLimit: 500
     }
   };
 
@@ -191,7 +224,18 @@ export class ParameterPresets {
       partialProfitLevel: 0.35,
       partialProfitSize: 0.40,
       moveStopToBreakeven: true,
-      reducedSignalSpacing: true
+      reducedSignalSpacing: true,
+      
+      // Institutional features - aggressive settings
+      enableGEXFilters: true,
+      enableVolumeProfile: true,
+      enableMicrofractals: true,
+      enableATRRiskManagement: true,
+      requireConfluence: false, // More signals for aggressive
+      minConfidenceLevel: 0.5, // Lower confidence for more trades
+      enableGreeksMonitoring: true,
+      portfolioRiskLimit: 15.0, // Higher risk for aggressive
+      dailyLossLimit: 750
     }
   };
 

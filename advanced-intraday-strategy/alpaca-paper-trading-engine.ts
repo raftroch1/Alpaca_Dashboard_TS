@@ -1003,9 +1003,26 @@ export class AlpacaPaperTradingEngine {
           continue;
         }
         
-        // Check for stop loss (35% loss OR hit stop price)
-        if (absoluteLossPct >= this.INITIAL_STOP_LOSS_PCT || currentValue <= trade.initialStopLoss!) {
-          console.log(`🛑 STOP LOSS TRIGGERED: ${(absoluteLossPct * 100).toFixed(1)}% loss >= ${(this.INITIAL_STOP_LOSS_PCT * 100).toFixed(0)}%`);
+        // Check for stop loss (35% loss OR hit stop price OR 30% real loss for 0-DTE protection)
+        const percentageLossTriggered = absoluteLossPct >= this.INITIAL_STOP_LOSS_PCT;
+        const priceLossTriggered = currentValue <= trade.initialStopLoss!;
+        const realLossTriggered = absoluteLossPct >= 0.30; // 30% real loss trigger for 0-DTE protection
+        
+        if (percentageLossTriggered || priceLossTriggered || realLossTriggered) {
+          let triggerReason;
+          if (realLossTriggered && absoluteLossPct < this.INITIAL_STOP_LOSS_PCT) {
+            triggerReason = `30% real loss protection: ${(absoluteLossPct * 100).toFixed(1)}% >= 30%`;
+          } else if (percentageLossTriggered) {
+            triggerReason = `${(absoluteLossPct * 100).toFixed(1)}% loss >= ${(this.INITIAL_STOP_LOSS_PCT * 100).toFixed(0)}%`;
+          } else {
+            triggerReason = `Price $${currentValue.toFixed(2)} <= $${trade.initialStopLoss!.toFixed(2)}`;
+          }
+            
+          console.log(`🛑 STOP LOSS TRIGGERED: ${triggerReason}`);
+          console.log(`   📊 Loss Check: ${(absoluteLossPct * 100).toFixed(1)}% vs ${(this.INITIAL_STOP_LOSS_PCT * 100).toFixed(0)}% = ${percentageLossTriggered ? 'TRIGGERED' : 'OK'}`);
+          console.log(`   💰 Price Check: $${currentValue.toFixed(2)} vs $${trade.initialStopLoss!.toFixed(2)} = ${priceLossTriggered ? 'TRIGGERED' : 'OK'}`);
+          console.log(`   🔥 Real Loss Check: ${(absoluteLossPct * 100).toFixed(1)}% vs 30% = ${realLossTriggered ? 'TRIGGERED' : 'OK'}`);
+          
           await this.closeTradeManually(trade, currentValue, 'STOP_LOSS');
           continue;
         }

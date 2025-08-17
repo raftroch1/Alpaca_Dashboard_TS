@@ -179,10 +179,12 @@
                     <div class="parameter-control">
                         <label for="minSignalSpacingMinutes">Signal Spacing (minutes)</label>
                         <select id="minSignalSpacingMinutes">
-                            <option value="5" selected>5 minutes</option>
-                            <option value="15">15 minutes</option>
-                            <option value="30">30 minutes</option>
-                            <option value="60">60 minutes</option>
+                                        <option value="1">1 minute</option>
+            <option value="3">3 minutes</option>
+            <option value="5" selected>5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">60 minutes</option>
                         </select>
                         <span class="parameter-info">Between signals</span>
                     </div>
@@ -220,9 +222,11 @@
                     <div class="parameter-control">
                         <label for="forceExitTime">Force Exit Time</label>
                         <select id="forceExitTime">
-                            <option value="15.0">3:00 PM</option>
-                            <option value="15.5" selected>3:30 PM</option>
-                            <option value="16.0">4:00 PM</option>
+                                        <option value="15.0">3:00 PM</option>
+            <option value="15.5" selected>3:30 PM</option>
+            <option value="15.75">3:45 PM</option>
+            <option value="15.92">3:55 PM</option>
+            <option value="16.0">4:00 PM</option>
                         </select>
                         <span class="parameter-info">0-DTE protection</span>
                     </div>
@@ -280,6 +284,40 @@
                     </div>
                 </div>
                 
+                <!-- Backtest Period Selection -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3>📅 Backtest Period</h3>
+                    </div>
+                    <div class="parameter-grid">
+                        <div class="parameter-control">
+                            <label for="backtestPeriod">Select Period</label>
+                            <select id="backtestPeriod">
+                                <option value="3days">Last 3 Days (Quick Test)</option>
+                                <option value="1week">Last 1 Week</option>
+                                <option value="2weeks">Last 2 Weeks</option>
+                                <option value="1month">Last 1 Month</option>
+                                <option value="3months">Last 3 Months</option>
+                                <option value="6months">Last 6 Months</option>
+                                <option value="custom">Custom Date Range</option>
+                            </select>
+                            <span class="parameter-info">More data = more reliable results</span>
+                        </div>
+                        
+                        <div class="parameter-control" id="customDateRange" style="display: none;">
+                            <label for="startDate">Start Date</label>
+                            <input type="date" id="startDate" min="2024-02-01" max="2024-12-31">
+                            <span class="parameter-info">Alpaca data from Feb 2024</span>
+                        </div>
+                        
+                        <div class="parameter-control" id="customEndDate" style="display: none;">
+                            <label for="endDate">End Date</label>
+                            <input type="date" id="endDate" min="2024-02-01" max="2024-12-31">
+                            <span class="parameter-info">End date for custom range</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Action Buttons -->
                 <div class="action-buttons">
                     <button class="btn btn-primary" id="applyParametersBtn">

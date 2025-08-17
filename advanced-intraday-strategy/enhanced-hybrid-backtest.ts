@@ -41,7 +41,7 @@ interface EnhancedTrade {
   initialStopLoss?: number;
 }
 
-class EnhancedHybridBacktest {
+export class EnhancedHybridBacktest {
   
   private openTrades: EnhancedTrade[] = [];
   private closedTrades: EnhancedTrade[] = [];
@@ -52,20 +52,20 @@ class EnhancedHybridBacktest {
   private currentDay = '';
   private lastSignalTime = 0;
   
-  // Enhanced 0-DTE parameters
-  private readonly DAILY_TRADE_TARGET = 3;
-  private readonly TARGET_WIN_SIZE = 150;
-  private readonly TARGET_LOSS_SIZE = 100;
-  private readonly MIN_SIGNAL_SPACING_MINUTES = 30;
+  // Enhanced 0-DTE parameters (configurable for dashboard)
+  private DAILY_TRADE_TARGET = 3;
+  private TARGET_WIN_SIZE = 150;
+  private TARGET_LOSS_SIZE = 100;
+  private MIN_SIGNAL_SPACING_MINUTES = 30;
   
-  // 0-DTE specific risk management
-  private readonly INITIAL_STOP_LOSS_PCT = 0.30;      // 30% initial stop (tighter for 0-DTE)
-  private readonly PROFIT_TARGET_PCT = 0.60;          // 60% profit target
-  private readonly TRAIL_ACTIVATION_PCT = 0.25;       // Start trailing after 25% profit
-  private readonly TRAIL_STOP_PCT = 0.15;             // 15% trailing stop
-  private readonly MAX_HOLD_MINUTES_MORNING = 90;     // 1.5 hours max morning
-  private readonly MAX_HOLD_MINUTES_AFTERNOON = 60;   // 1 hour max afternoon
-  private readonly FORCE_EXIT_TIME = 15.5;            // 3:30 PM force exit
+  // 0-DTE specific risk management (configurable for dashboard)
+  private INITIAL_STOP_LOSS_PCT = 0.30;      // 30% initial stop (tighter for 0-DTE)
+  private PROFIT_TARGET_PCT = 0.60;          // 60% profit target
+  private TRAIL_ACTIVATION_PCT = 0.25;       // Start trailing after 25% profit
+  private TRAIL_STOP_PCT = 0.15;             // 15% trailing stop
+  private MAX_HOLD_MINUTES_MORNING = 90;     // 1.5 hours max morning
+  private MAX_HOLD_MINUTES_AFTERNOON = 60;   // 1 hour max afternoon
+  private FORCE_EXIT_TIME = 15.5;            // 3:30 PM force exit
 
   constructor(initialCapital: number) {
     this.currentBalance = initialCapital;
@@ -74,6 +74,30 @@ class EnhancedHybridBacktest {
     console.log(`   🎯 Target: ${this.DAILY_TRADE_TARGET} trades/day`);
     console.log(`   💰 Targets: $${this.TARGET_WIN_SIZE} wins, $${this.TARGET_LOSS_SIZE} losses`);
     console.log(`   🛡️  0-DTE Risk: ${this.INITIAL_STOP_LOSS_PCT*100}% stop, ${this.TRAIL_STOP_PCT*100}% trail`);
+  }
+  
+  /**
+   * Update parameters for dashboard integration
+   * This allows the dashboard to customize backtest behavior
+   */
+  updateParameters(params: any): void {
+    if (params.dailyTradeTarget !== undefined) this.DAILY_TRADE_TARGET = params.dailyTradeTarget || 999;
+    if (params.targetWinSize !== undefined) this.TARGET_WIN_SIZE = params.targetWinSize;
+    if (params.targetLossSize !== undefined) this.TARGET_LOSS_SIZE = params.targetLossSize;
+    if (params.minSignalSpacingMinutes !== undefined) this.MIN_SIGNAL_SPACING_MINUTES = params.minSignalSpacingMinutes;
+    if (params.initialStopLossPct !== undefined) this.INITIAL_STOP_LOSS_PCT = params.initialStopLossPct;
+    if (params.profitTargetPct !== undefined) this.PROFIT_TARGET_PCT = params.profitTargetPct;
+    if (params.trailActivationPct !== undefined) this.TRAIL_ACTIVATION_PCT = params.trailActivationPct;
+    if (params.trailStopPct !== undefined) this.TRAIL_STOP_PCT = params.trailStopPct;
+    if (params.maxHoldMinutesMorning !== undefined) this.MAX_HOLD_MINUTES_MORNING = params.maxHoldMinutesMorning;
+    if (params.maxHoldMinutesAfternoon !== undefined) this.MAX_HOLD_MINUTES_AFTERNOON = params.maxHoldMinutesAfternoon;
+    if (params.forceExitTime !== undefined) this.FORCE_EXIT_TIME = params.forceExitTime;
+    
+    console.log('🔧 BACKTEST PARAMETERS UPDATED FOR DASHBOARD');
+    console.log(`   🎯 Daily Target: ${this.DAILY_TRADE_TARGET} trades`);
+    console.log(`   🛡️ Stop Loss: ${(this.INITIAL_STOP_LOSS_PCT * 100).toFixed(1)}%`);
+    console.log(`   📈 Profit Target: ${(this.PROFIT_TARGET_PCT * 100).toFixed(1)}%`);
+    console.log(`   ⏱️ Signal Spacing: ${this.MIN_SIGNAL_SPACING_MINUTES} minutes`);
   }
   
   async runEnhancedBacktest(strategy: Strategy, params: BacktestParams) {
@@ -720,6 +744,9 @@ async function testEnhancedHybrid() {
   }
 }
 
-testEnhancedHybrid().then(success => {
-  process.exit(success ? 0 : 1);
-});
+// testEnhancedHybrid().then(success => {
+//   process.exit(success ? 0 : 1);
+// });
+
+// Export for manual testing if needed
+export { testEnhancedHybrid };

@@ -14,7 +14,15 @@ import DashboardAlpacaTradingEngine from './dashboard-alpaca-trading-engine';
 
 interface DashboardMessage {
   type: 'UPDATE_PARAMETERS' | 'RUN_BACKTEST' | 'START_PAPER_TRADING' | 'EMERGENCY_STOP' | 'REQUEST_STATUS';
-  config?: Partial<TradingParameters>;
+  config?: Partial<TradingParameters> & {
+    backtestPeriod?: {
+      type: 'daysBack' | 'custom';
+      daysBack?: number;
+      startDate?: string;
+      endDate?: string;
+      description?: string;
+    };
+  };
   data?: any;
 }
 
@@ -181,26 +189,50 @@ export class DashboardServer {
     console.log('📝 Note: Parameter changes ready for application to trading engine');
   }
 
-  private async handleRunBacktest(clientId: string, config: Partial<TradingParameters>): Promise<void> {
-    console.log('📊 Starting backtest with custom parameters...');
+  private async handleRunBacktest(clientId: string, config: Partial<TradingParameters> & { backtestPeriod?: any }): Promise<void> {
+    console.log('📊 Starting REAL backtest with dashboard parameters...');
 
     try {
-      // Update parameters for backtest
-      const testParameters = { ...this.currentParameters, ...config };
+      // Extract backtest period info
+      const backtestPeriod = config.backtestPeriod || { type: 'daysBack', daysBack: 3, description: 'Last 3 Days' };
+      
+      // Update parameters for backtest (excluding backtestPeriod from trading parameters)
+      const { backtestPeriod: _, ...tradingConfig } = config;
+      const testParameters = { ...this.currentParameters, ...tradingConfig };
 
-      // Simulate backtest execution
-      // In a real implementation, this would call your existing backtest engine
-      const results = await this.simulateBacktest(testParameters);
+      console.log(`📅 Backtest Period: ${backtestPeriod.description}`);
+      
+      // Import and run REAL backtest engine with dashboard parameters
+      const { DashboardBacktestRunner } = await import('./backtest-runner');
+      
+      let results;
+      if (backtestPeriod.type === 'custom') {
+        // Use custom date range
+        results = await DashboardBacktestRunner.runBacktestWithCustomDates(
+          testParameters,
+          '1Min',
+          backtestPeriod.startDate,
+          backtestPeriod.endDate
+        );
+      } else {
+        // Use days back
+        results = await DashboardBacktestRunner.runBacktestWithParameters(
+          testParameters,
+          '1Min',
+          backtestPeriod.daysBack || 3
+        );
+      }
 
       this.sendToClient(clientId, {
         type: 'BACKTEST_RESULTS',
         results
       });
 
-      console.log('✅ Backtest completed successfully');
+      console.log('✅ REAL backtest completed successfully');
+      console.log(`📊 Results: ${results.totalTrades} trades, ${(results.winRate * 100).toFixed(1)}% win rate`);
 
     } catch (error) {
-      console.error('❌ Backtest failed:', error);
+      console.error('❌ Real backtest failed:', error);
       this.sendError(clientId, `Backtest failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
