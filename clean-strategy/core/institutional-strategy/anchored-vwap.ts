@@ -12,7 +12,7 @@
  * - Multiple AVWAP convergence creates powerful confluence zones
  */
 
-import { MarketData } from '../lib/types';
+import { MarketData } from '../../../lib/types';
 
 export interface AVWAPData {
   timestamp: Date;

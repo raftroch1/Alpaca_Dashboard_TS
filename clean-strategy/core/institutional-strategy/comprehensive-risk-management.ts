@@ -14,8 +14,8 @@
  * - Emergency shutdown protocols
  */
 
-import { MarketData, OptionsChain, Strategy } from '../lib/types';
-import { GreeksSnapshot } from '../lib/greeks-engine';
+import { MarketData, OptionsChain, Strategy } from '../../../lib/types';
+import { GreeksSnapshot } from '../../../lib/greeks-engine';
 import { ATRSnapshot } from './enhanced-atr-risk-mgmt';
 import { StrategySignal } from './coherent-strategy-framework';
 

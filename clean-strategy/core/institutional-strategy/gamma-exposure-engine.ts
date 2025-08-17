@@ -12,7 +12,7 @@
  * - Gamma Flip Point: Critical level where aggregate gamma transitions
  */
 
-import { OptionsChain, MarketData } from '../lib/types';
+import { OptionsChain, MarketData } from '../../../lib/types';
 
 export interface GammaExposureData {
   strike: number;

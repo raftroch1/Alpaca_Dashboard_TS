@@ -3,9 +3,10 @@ import { MarketRegimeDetector, MarketRegime } from './market-regime-detector';
 import { BullPutSpreadStrategy } from './bull-put-spread-strategy';
 import { BearCallSpreadStrategy } from './bear-call-spread-strategy';
 import { IronCondorStrategy } from './iron-condor-strategy';
+import { TechnicalAnalysis } from './technical-indicators';
 
 export interface StrategySelection {
-  selectedStrategy: 'BULL_PUT_SPREAD' | 'BEAR_CALL_SPREAD' | 'IRON_CONDOR' | 'NO_TRADE';
+  selectedStrategy: 'BUY_CALL' | 'BUY_PUT' | 'BULL_PUT_SPREAD' | 'BEAR_CALL_SPREAD' | 'IRON_CONDOR' | 'NO_TRADE';
   marketRegime: MarketRegime;
   signal: TradeSignal | null;
   reasoning: string[];
@@ -162,7 +163,7 @@ export class AdaptiveStrategySelector {
     ];
     
     // 2. STRATEGY SELECTION BASED ON REGIME
-    let selectedStrategy: 'BULL_PUT_SPREAD' | 'BEAR_CALL_SPREAD' | 'IRON_CONDOR' | 'NO_TRADE';
+    let selectedStrategy: 'BUY_CALL' | 'BUY_PUT' | 'BULL_PUT_SPREAD' | 'BEAR_CALL_SPREAD' | 'IRON_CONDOR' | 'NO_TRADE';
     let signal: TradeSignal | null = null;
     
     // Minimum confidence threshold
@@ -203,31 +204,61 @@ export class AdaptiveStrategySelector {
     reasoning.push(`✅ Volatility: ${volatilityFilters.reason}`);
     reasoning.push(`✅ Liquidity: ${liquidityFilters.reason}`);
     
-    // FULL MULTI-STRATEGY IMPLEMENTATION WITH ENHANCED FILTERS
+    // 🚀 NAKED OPTIONS IMPLEMENTATION (as requested by user)
+    // Use simple naked calls/puts instead of complex spreads
     
-    switch (marketRegime.regime) {
-      case 'BULLISH':
-        selectedStrategy = 'BULL_PUT_SPREAD';
-        reasoning.push('BULLISH regime → Bull Put Spread strategy selected');
-        signal = BullPutSpreadStrategy.generateSpreadSignal(marketData, optionsChain, strategy);
-        break;
-        
-      case 'BEARISH':
-        selectedStrategy = 'BEAR_CALL_SPREAD';
-        reasoning.push('BEARISH regime → Bear Call Spread strategy selected');
-        signal = BearCallSpreadStrategy.generateSpreadSignal(marketData, optionsChain, strategy);
-        break;
-        
-      case 'NEUTRAL':
-        selectedStrategy = 'IRON_CONDOR';
-        reasoning.push('NEUTRAL regime → Iron Condor strategy selected');
-        signal = IronCondorStrategy.generateSpreadSignal(marketData, optionsChain, strategy);
-        break;
-        
-      default:
-        selectedStrategy = 'NO_TRADE';
-        reasoning.push('Unknown regime - NO TRADE');
-        break;
+    // Calculate technical indicators for naked option signals
+    const indicators = TechnicalAnalysis.calculateAllIndicators(
+      marketData,
+      strategy.rsiPeriod || 14,
+      strategy.macdFast || 12,
+      strategy.macdSlow || 26,
+      strategy.macdSignal || 9,
+      strategy.bbPeriod || 20,
+      strategy.bbStdDev || 2
+    );
+    
+    if (!indicators) {
+      selectedStrategy = 'NO_TRADE';
+      reasoning.push('Technical indicators calculation failed');
+      signal = null;
+    } else {
+      switch (marketRegime.regime) {
+        case 'BULLISH':
+          selectedStrategy = 'BUY_CALL';
+          reasoning.push('BULLISH regime → Buy Call (naked option)');
+          signal = this.generateNakedCallSignal(indicators, marketData, strategy);
+          break;
+          
+        case 'BEARISH':
+          selectedStrategy = 'BUY_PUT';
+          reasoning.push('BEARISH regime → Buy Put (naked option)');
+          signal = this.generateNakedPutSignal(indicators, marketData, strategy);
+          break;
+          
+        case 'NEUTRAL':
+          // In neutral markets, look for RSI extremes
+          if (indicators.rsi < (strategy.rsiOversold || 30)) {
+            selectedStrategy = 'BUY_CALL';
+            reasoning.push('NEUTRAL regime + RSI oversold → Buy Call');
+            signal = this.generateNakedCallSignal(indicators, marketData, strategy);
+          } else if (indicators.rsi > (strategy.rsiOverbought || 70)) {
+            selectedStrategy = 'BUY_PUT';
+            reasoning.push('NEUTRAL regime + RSI overbought → Buy Put');
+            signal = this.generateNakedPutSignal(indicators, marketData, strategy);
+          } else {
+            selectedStrategy = 'NO_TRADE';
+            reasoning.push('NEUTRAL regime - no RSI extreme');
+            signal = null;
+          }
+          break;
+          
+        default:
+          selectedStrategy = 'NO_TRADE';
+          reasoning.push('Unknown regime - NO TRADE');
+          signal = null;
+          break;
+      }
     }
     
     console.log(`🎯 STRATEGY SELECTED: ${selectedStrategy}`);
@@ -242,6 +273,106 @@ export class AdaptiveStrategySelector {
       marketRegime,
       signal,
       reasoning
+    };
+  }
+  
+  /**
+   * Generate naked call signal (bullish)
+   */
+  private static generateNakedCallSignal(
+    indicators: any,
+    marketData: MarketData[],
+    strategy: any
+  ): TradeSignal | null {
+    
+    const currentPrice = marketData[marketData.length - 1].close;
+    let confidence = 50;
+    let reason = 'Naked Call: ';
+    
+    // RSI oversold boost
+    if (indicators.rsi < 30) {
+      confidence += 15;
+      reason += `RSI oversold (${indicators.rsi.toFixed(1)}), `;
+    }
+    
+    // MACD bullish
+    if (indicators.macd > indicators.macdSignal) {
+      confidence += 10;
+      reason += 'MACD bullish, ';
+    }
+    
+    // Price below BB lower band (oversold)
+    if (currentPrice < indicators.bbLower) {
+      confidence += 10;
+      reason += 'Price below BB lower, ';
+    }
+    
+    // Volume confirmation (if available)
+    const currentVolume = Number(marketData[marketData.length - 1].volume || 0);
+    const avgVolume = marketData.slice(-20).reduce((sum, bar) => sum + Number(bar.volume || 0), 0) / 20;
+    if (currentVolume > avgVolume * 1.2) {
+      confidence += 5;
+      reason += 'High volume, ';
+    }
+    
+    reason = reason.slice(0, -2); // Remove trailing comma
+    
+    return {
+      action: 'BUY_CALL',
+      confidence: Math.min(85, confidence),
+      reason,
+      indicators,
+      timestamp: new Date()
+    };
+  }
+  
+  /**
+   * Generate naked put signal (bearish)
+   */
+  private static generateNakedPutSignal(
+    indicators: any,
+    marketData: MarketData[],
+    strategy: any
+  ): TradeSignal | null {
+    
+    const currentPrice = marketData[marketData.length - 1].close;
+    let confidence = 50;
+    let reason = 'Naked Put: ';
+    
+    // RSI overbought boost
+    if (indicators.rsi > 70) {
+      confidence += 15;
+      reason += `RSI overbought (${indicators.rsi.toFixed(1)}), `;
+    }
+    
+    // MACD bearish
+    if (indicators.macd < indicators.macdSignal) {
+      confidence += 10;
+      reason += 'MACD bearish, ';
+    }
+    
+    // Price above BB upper band (overbought)
+    if (currentPrice > indicators.bbUpper) {
+      confidence += 10;
+      reason += 'Price above BB upper, ';
+    }
+    
+    // Volume confirmation (if available)
+    const currentVolume = Number(marketData[marketData.length - 1].volume || 0);
+    const avgVolume = marketData.slice(-20).reduce((sum, bar) => sum + Number(bar.volume || 0), 0) / 20;
+    if (currentVolume > avgVolume * 1.2) {
+      confidence += 5;
+      reason += 'High volume, ';
+    }
+    
+    reason = reason.slice(0, -2); // Remove trailing comma
+    
+    return {
+      action: 'BUY_PUT',
+      confidence: Math.min(85, confidence),
+      reason,
+      indicators,
+      timestamp: new Date()
     };
   }
 }

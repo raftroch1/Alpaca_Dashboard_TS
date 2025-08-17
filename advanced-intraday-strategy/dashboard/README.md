@@ -1,6 +1,34 @@
 # 🎛️ Trading Strategy Dashboard
 
-A comprehensive web-based dashboard for managing and controlling your 0-DTE options trading strategy in real-time. Adjust parameters, run backtests, and monitor performance without modifying core code.
+## 🏛️ **INSTITUTIONAL-GRADE ENGINE** ⚠️
+
+**CRITICAL UPDATE: This dashboard now uses the REAL institutional-advanced-backtest.ts engine**
+
+### **🚀 WHAT CHANGED:**
+- ❌ **DELETED**: `enhanced-hybrid-backtest.ts` (basic 0-DTE strategy) - **PERMANENTLY REMOVED TO AVOID CONFUSION**
+- ✅ **UPGRADED**: Now uses `institutional-advanced-backtest.ts` (full institutional suite)
+- ✅ **ALIGNED**: Paper trading uses same institutional signal logic as backtest
+
+### **🏛️ INSTITUTIONAL FEATURES NOW ACTIVE:**
+- ✅ **GEX Analysis** (Gamma Exposure) - Real dealer positioning
+- ✅ **Volume Profile** (AVP) - Institutional support/resistance  
+- ✅ **Anchored VWAP** (AVWAP) - Professional trend analysis
+- ✅ **Microfractal-Fibonacci** - Precise institutional entries
+- ✅ **Coherent Strategy Framework** - Multi-indicator confluence
+- ✅ **Greeks Risk Management** - Delta, Gamma, Theta, Vega limits
+- ✅ **Transaction Costs** - Realistic slippage and commissions
+- ✅ **Signal Quality Filtering** - Minimum confidence thresholds
+
+### **🎯 PERFECT ALIGNMENT:**
+Both backtest AND paper trading now use the **exact same institutional signal generation**:
+- **Backtest**: `lib/BacktestEngine.runBacktest()` → `AdaptiveStrategySelector.generateAdaptiveSignal()`
+- **Paper Trading**: `AdaptiveStrategySelector.generateAdaptiveSignal()` (SAME METHOD)
+- **Parameters**: All dashboard settings affect both systems identically
+- **Features**: Greeks, Transaction Costs, Portfolio Risk Management, Spread Strategies
+
+---
+
+A comprehensive web-based dashboard for managing and controlling your **institutional-grade** options trading strategy in real-time. Adjust parameters, run backtests, and monitor performance without modifying core code.
 
 ## ✨ Features
 
@@ -217,6 +245,8 @@ netstat -an | grep 8080
 
 # Restart dashboard server
 npx ts-node dashboard/launch-dashboard.ts
+npx ts-node launch-dashboard.ts
+ ./launch-dashboard.sh
 ```
 
 ### 📊 Backtest Failures

@@ -13,10 +13,10 @@
  * - Advanced performance metrics
  */
 
-import { MarketData, OptionsChain, Strategy, BacktestParams, BacktestTrade, PerformanceMetrics } from '../lib/types';
-import { GreeksSnapshot, GreeksEngine } from '../lib/greeks-engine';
-import { FillSimulation, TransactionCostEngine } from '../lib/transaction-cost-engine';
-import { alpacaClient } from '../lib/alpaca';
+import { MarketData, OptionsChain, Strategy, BacktestParams, BacktestTrade, PerformanceMetrics } from '../../../lib/types';
+import { GreeksSnapshot, GreeksEngine } from '../../../lib/greeks-engine';
+import { FillSimulation, TransactionCostEngine } from '../../../lib/transaction-cost-engine';
+import { alpacaClient } from '../../../lib/alpaca';
 import CoherentStrategyFramework, { StrategySignal } from './coherent-strategy-framework';
 import EnhancedATRRiskManager from './enhanced-atr-risk-mgmt';
 

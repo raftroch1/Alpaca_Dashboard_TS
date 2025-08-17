@@ -24,15 +24,15 @@ import {
   BearCallSpread,
   IronCondor,
   TradeSignal
-} from '../lib/types';
+} from '../../../lib/types';
 
-import { GreeksEngine, GreeksSnapshot } from '../lib/greeks-engine';
-import { TransactionCostEngine, FillSimulation } from '../lib/transaction-cost-engine';
-import { AdaptiveStrategySelector } from '../lib/adaptive-strategy-selector';
-import { BullPutSpreadStrategy } from '../lib/bull-put-spread-strategy';
-import { BearCallSpreadStrategy } from '../lib/bear-call-spread-strategy';
-import { IronCondorStrategy } from '../lib/iron-condor-strategy';
-import { TechnicalAnalysis } from '../lib/technical-indicators';
+import { GreeksEngine, GreeksSnapshot } from '../../../lib/greeks-engine';
+import { TransactionCostEngine, FillSimulation } from '../../../lib/transaction-cost-engine';
+import { AdaptiveStrategySelector } from '../../../lib/adaptive-strategy-selector';
+import { BullPutSpreadStrategy } from '../../../lib/bull-put-spread-strategy';
+import { BearCallSpreadStrategy } from '../../../lib/bear-call-spread-strategy';
+import { IronCondorStrategy } from '../../../lib/iron-condor-strategy';
+import { TechnicalAnalysis } from '../../../lib/technical-indicators';
 
 // NEW: Advanced strategy framework imports
 import CoherentStrategyFramework, { StrategySignal } from './coherent-strategy-framework';

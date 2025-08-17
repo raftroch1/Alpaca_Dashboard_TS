@@ -12,7 +12,7 @@
  * - Pattern recognition: Systematic identification of reversal patterns
  */
 
-import { MarketData } from '../lib/types';
+import { MarketData } from '../../../lib/types';
 
 export interface FractalPattern {
   type: 'BULLISH' | 'BEARISH';

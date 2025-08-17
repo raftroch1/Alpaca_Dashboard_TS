@@ -52,15 +52,11 @@ export class DashboardBacktestRunner {
       // Create backtest parameters
       const backtestParams = this.createBacktestParams(daysBack);
       
-      // Use existing proven enhanced hybrid backtest
-      const { EnhancedHybridBacktest } = await import('../enhanced-hybrid-backtest');
-      const backtest = new (EnhancedHybridBacktest as any)(backtestParams.initialCapital);
+      // 🏛️ USE INSTITUTIONAL LIB/BACKTEST-ENGINE (Greeks, Transaction Costs, Portfolio Risk)
+      const { BacktestEngine } = await import('../../lib/backtest-engine');
       
-      // Apply dashboard parameters to the proven backtest engine
-      this.applyParametersToBacktest(backtest, parameters);
-      
-      // Run the proven backtest with institutional parameters available
-      const results = await backtest.runEnhancedBacktest(strategy, backtestParams);
+      // Run institutional backtest with all professional features
+      const results = await BacktestEngine.runBacktest(strategy, backtestParams);
       
       // Transform results for dashboard
       const dashboardResults = this.transformResults(results, parameters, daysBack);
@@ -106,15 +102,11 @@ export class DashboardBacktestRunner {
       // Create backtest parameters with custom dates
       const backtestParams = this.createBacktestParamsWithDates(startDate, endDate);
       
-      // Use existing proven enhanced hybrid backtest
-      const { EnhancedHybridBacktest } = await import('../enhanced-hybrid-backtest');
-      const backtest = new (EnhancedHybridBacktest as any)(backtestParams.initialCapital);
+      // 🏛️ USE INSTITUTIONAL LIB/BACKTEST-ENGINE (Greeks, Transaction Costs, Portfolio Risk)
+      const { BacktestEngine } = await import('../../lib/backtest-engine');
       
-      // Apply dashboard parameters to the proven backtest engine
-      this.applyParametersToBacktest(backtest, parameters);
-      
-      // Run the proven backtest with institutional parameters available
-      const results = await backtest.runEnhancedBacktest(strategy, backtestParams);
+      // Run institutional backtest with all professional features
+      const results = await BacktestEngine.runBacktest(strategy, backtestParams);
       
       // Calculate days for period description
       const start = new Date(startDate);

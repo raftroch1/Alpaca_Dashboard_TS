@@ -580,39 +580,141 @@ export class BacktestEngine {
         
         const signal = strategySelection.signal;
         
-        if (signal && (signal.action === 'BULL_PUT_SPREAD' || signal.action === 'BEAR_CALL_SPREAD' || signal.action === 'IRON_CONDOR') && signal.spread) {
-          const spread = signal.spread;
+        // Handle both naked options and spreads
+        if (signal && (signal.action === 'BUY_CALL' || signal.action === 'BUY_PUT' || signal.action === 'BULL_PUT_SPREAD' || signal.action === 'BEAR_CALL_SPREAD' || signal.action === 'IRON_CONDOR')) {
           
-          // Calculate position size based on max loss (more conservative)
           let positionSize = 0;
-          if (signal.action === 'BULL_PUT_SPREAD') {
-            positionSize = BullPutSpreadStrategy.calculateSpreadPositionSize(currentBalance, spread.maxLoss, strategy);
-          } else if (signal.action === 'BEAR_CALL_SPREAD') {
-            positionSize = BearCallSpreadStrategy.calculateSpreadPositionSize(currentBalance, spread.maxLoss, strategy);
-          } else if (signal.action === 'IRON_CONDOR') {
-            positionSize = IronCondorStrategy.calculateSpreadPositionSize(currentBalance, spread.maxLoss, strategy);
+          
+          // 🚀 NAKED OPTIONS HANDLING (as requested)
+          if (signal.action === 'BUY_CALL' || signal.action === 'BUY_PUT') {
+            // For naked options, position size is based on percentage of account
+            const maxRiskPerTrade = strategy.positionSizePercent || 0.02; // 2% default
+            const optionPrice = 2.50; // Estimate $2.50 per contract (realistic for 0-DTE)
+            const maxContracts = Math.floor((currentBalance * maxRiskPerTrade) / (optionPrice * 100));
+            positionSize = Math.max(1, Math.min(maxContracts, 10)); // 1-10 contracts
+            
+            console.log(`🚀 NAKED OPTION TRADE: ${signal.action}`);
+            console.log(`💰 Account: $${currentBalance.toFixed(2)}, Risk: ${(maxRiskPerTrade * 100)}%, Contracts: ${positionSize}`);
+            
+          } else {
+            // SPREAD HANDLING (existing logic)
+            const spread = signal.spread;
+            if (spread) {
+              if (signal.action === 'BULL_PUT_SPREAD') {
+                positionSize = BullPutSpreadStrategy.calculateSpreadPositionSize(currentBalance, spread.maxLoss, strategy);
+              } else if (signal.action === 'BEAR_CALL_SPREAD') {
+                positionSize = BearCallSpreadStrategy.calculateSpreadPositionSize(currentBalance, spread.maxLoss, strategy);
+              } else if (signal.action === 'IRON_CONDOR') {
+                positionSize = IronCondorStrategy.calculateSpreadPositionSize(currentBalance, spread.maxLoss, strategy);
+              }
+            }
           }
           
           if (positionSize > 0) {
+            
+            // 🚀 NAKED OPTIONS EXECUTION
+            if (signal.action === 'BUY_CALL' || signal.action === 'BUY_PUT') {
+              
+              // Calculate indicators for this trade
+              const indicators = TechnicalAnalysis.calculateAllIndicators(
+                historicalData,
+                strategy.rsiPeriod,
+                strategy.macdFast,
+                strategy.macdSlow,
+                strategy.macdSignal,
+                strategy.bbPeriod,
+                strategy.bbStdDev
+              );
+              
+              // Find suitable option from chain
+              const currentPrice = marketData[i].close;
+              const targetDelta = 0.5; // ATM options
+              const optionType = signal.action === 'BUY_CALL' ? 'call' : 'put';
+              
+              // Find closest ATM option
+              const suitableOptions = optionsChain.filter(opt => 
+                opt.side.toLowerCase() === optionType && 
+                Math.abs(opt.strike - currentPrice) < 20 // Within $20 of current price
+              );
+              
+              if (suitableOptions.length > 0) {
+                // Pick the closest to ATM
+                const selectedOption = suitableOptions.reduce((closest, current) => 
+                  Math.abs(current.strike - currentPrice) < Math.abs(closest.strike - currentPrice) ? current : closest
+                );
+                
+                const optionPrice = (selectedOption.bid + selectedOption.ask) / 2;
+                const totalCost = optionPrice * positionSize * 100; // 100 shares per contract
+                
+                console.log(`🚀 EXECUTING NAKED OPTION: ${signal.action}`);
+                console.log(`📊 Strike: $${selectedOption.strike}, Price: $${optionPrice.toFixed(2)}, Contracts: ${positionSize}`);
+                console.log(`💰 Total Cost: $${totalCost.toFixed(2)}`);
+                
+                // Create naked option trade
+                const trade: BacktestTrade = {
+                  id: `${signal.action}_${currentDate.getTime()}`,
+                  backtestId: 'dashboard-backtest',
+                  symbol: selectedOption.symbol,
+                  side: signal.action === 'BUY_CALL' ? 'CALL' : 'PUT',
+                  quantity: positionSize,
+                  entryPrice: optionPrice,
+                  entryDate: currentDate,
+                  strike: selectedOption.strike,
+                  expiration: selectedOption.expiration,
+                  pnl: 0,
+                  rsiValue: indicators?.rsi || 0,
+                  macdValue: indicators?.macd || 0,
+                  macdSignalValue: indicators?.macdSignal || 0,
+                  createdAt: currentDate
+                };
+                
+                trades.push(trade);
+                
+                // Create position for tracking
+                const position: BacktestPosition = {
+                  symbol: selectedOption.symbol,
+                  side: signal.action === 'BUY_CALL' ? 'CALL' : 'PUT',
+                  strike: selectedOption.strike,
+                  expiration: selectedOption.expiration,
+                  entryDate: currentDate,
+                  entryPrice: optionPrice,
+                  quantity: positionSize,
+                  indicators: indicators || {}
+                };
+                
+                openPositions.push(position);
+                
+                console.log(`✅ NAKED OPTION TRADE OPENED: ${trade.id}`);
+                continue; // Skip spread logic
+              } else {
+                console.log(`❌ No suitable ${optionType} options found`);
+                continue;
+              }
+            }
+            
+            // SPREAD HANDLING (existing logic)
             // Calculate spread cost based on strategy type
             let spreadCost = 0;
             let strategySymbol = '';
+            const spread = signal.spread;
             
-            if (signal.action === 'BULL_PUT_SPREAD') {
-              const bullSpread = spread as BullPutSpread;
-              spreadCost = (bullSpread.buyPut.ask - bullSpread.sellPut.bid) * positionSize * 100;
-              strategySymbol = `${bullSpread.sellPut.symbol}/${bullSpread.buyPut.symbol}`;
-            } else if (signal.action === 'BEAR_CALL_SPREAD') {
-              const bearSpread = spread as BearCallSpread;
-              spreadCost = (bearSpread.buyCall.ask - bearSpread.sellCall.bid) * positionSize * 100;
-              strategySymbol = `${bearSpread.sellCall.symbol}/${bearSpread.buyCall.symbol}`;
-            } else if (signal.action === 'IRON_CONDOR') {
-              const condorSpread = spread as IronCondor;
-              spreadCost = ((condorSpread.buyPut.ask + condorSpread.buyCall.ask) - (condorSpread.sellPut.bid + condorSpread.sellCall.bid)) * positionSize * 100;
-              strategySymbol = `${condorSpread.sellPut.symbol}/${condorSpread.sellCall.symbol} Condor`;
+            if (spread) {
+              if (signal.action === 'BULL_PUT_SPREAD') {
+                const bullSpread = spread as BullPutSpread;
+                spreadCost = (bullSpread.buyPut.ask - bullSpread.sellPut.bid) * positionSize * 100;
+                strategySymbol = `${bullSpread.sellPut.symbol}/${bullSpread.buyPut.symbol}`;
+              } else if (signal.action === 'BEAR_CALL_SPREAD') {
+                const bearSpread = spread as BearCallSpread;
+                spreadCost = (bearSpread.buyCall.ask - bearSpread.sellCall.bid) * positionSize * 100;
+                strategySymbol = `${bearSpread.sellCall.symbol}/${bearSpread.buyCall.symbol}`;
+              } else if (signal.action === 'IRON_CONDOR') {
+                const condorSpread = spread as IronCondor;
+                spreadCost = ((condorSpread.buyPut.ask + condorSpread.buyCall.ask) - (condorSpread.sellPut.bid + condorSpread.sellCall.bid)) * positionSize * 100;
+                strategySymbol = `${condorSpread.sellPut.symbol}/${condorSpread.sellCall.symbol} Condor`;
+              }
             }
             
-            const netCredit = spread.netCredit * positionSize * 100;
+            const netCredit = spread ? spread.netCredit * positionSize * 100 : 0;
             
             // CAPITAL PROTECTION: Ensure we don't risk more than we can afford
             const maxPositionRisk = Math.min(
@@ -622,40 +724,49 @@ export class BacktestEngine {
             
             if (Math.abs(spreadCost) <= maxPositionRisk) {
               
-              // ENHANCED: Calculate Greeks for spread position
-              const timeToExpiration = Math.max(0.001, 
-                (signal.action === 'BULL_PUT_SPREAD' ? (spread as BullPutSpread).sellPut.expiration.getTime() :
-                 signal.action === 'BEAR_CALL_SPREAD' ? (spread as BearCallSpread).sellCall.expiration.getTime() :
-                 (spread as IronCondor).sellPut.expiration.getTime()) - currentDate.getTime()
-              ) / (1000 * 60 * 60 * 24 * 365); // Convert to years
+              // ENHANCED: Calculate Greeks for spread position (only for spreads)
+              let spreadGreeks: GreeksSnapshot | null = null;
+              let timeToExpiration = 0.001; // Default for naked options
               
-              const spreadGreeks = this.calculateSpreadGreeks(
-                spread,
-                signal.action as 'BULL_PUT_SPREAD' | 'BEAR_CALL_SPREAD' | 'IRON_CONDOR',
-                currentPrice,
-                timeToExpiration,
-                positionSize
-              );
+              if (spread) {
+                timeToExpiration = Math.max(0.001, 
+                  (signal.action === 'BULL_PUT_SPREAD' ? (spread as BullPutSpread).sellPut.expiration.getTime() :
+                   signal.action === 'BEAR_CALL_SPREAD' ? (spread as BearCallSpread).sellCall.expiration.getTime() :
+                   (spread as IronCondor).sellPut.expiration.getTime()) - currentDate.getTime()
+                ) / (1000 * 60 * 60 * 24 * 365); // Convert to years
+                
+                spreadGreeks = this.calculateSpreadGreeks(
+                  spread,
+                  signal.action as 'BULL_PUT_SPREAD' | 'BEAR_CALL_SPREAD' | 'IRON_CONDOR',
+                  currentPrice,
+                  timeToExpiration,
+                  positionSize
+                );
+              }
               
-              // ENHANCED: Greeks-based position sizing
-              const greeksAdjustedSize = this.calculateGreeksBasedPositionSize(
-                spreadGreeks,
-                currentBalance,
-                positionSize,
-                strategy
-              );
+              // ENHANCED: Greeks-based position sizing (only for spreads)
+              let greeksAdjustedSize = positionSize;
               
-              // ENHANCED: Risk check before opening position
-              const riskCheck = this.shouldRejectPosition(
-                spreadGreeks,
-                greeksAdjustedSize,
-                currentBalance,
-                strategy
-              );
-              
-              if (riskCheck.reject) {
-                console.log(`🚫 Position rejected: ${riskCheck.reason}`);
-                continue; // Skip this position
+              if (spreadGreeks) {
+                greeksAdjustedSize = this.calculateGreeksBasedPositionSize(
+                  spreadGreeks,
+                  currentBalance,
+                  positionSize,
+                  strategy
+                );
+                
+                // ENHANCED: Risk check before opening position
+                const riskCheck = this.shouldRejectPosition(
+                  spreadGreeks,
+                  greeksAdjustedSize,
+                  currentBalance,
+                  strategy
+                );
+                
+                if (riskCheck.reject) {
+                  console.log(`🚫 Position rejected: ${riskCheck.reason}`);
+                  continue; // Skip this position
+                }
               }
               
               // ENHANCED: Portfolio-level risk check before opening position
@@ -671,15 +782,20 @@ export class BacktestEngine {
                 console.log(`⚠️  Portfolio warnings: ${portfolioRiskCheck.warnings.join(', ')}`);
               }
               
-              // ENHANCED: Calculate realistic transaction costs for entry
-              const entryCosts = this.calculateSpreadEntryCosts(
-                spread,
-                signal.action as 'BULL_PUT_SPREAD' | 'BEAR_CALL_SPREAD' | 'IRON_CONDOR',
-                greeksAdjustedSize
-              );
+              // ENHANCED: Calculate realistic transaction costs for entry (only for spreads)
+              let entryCosts: any = { netReceived: 0, totalCost: 0, fills: [] };
+              let realisticEntryCredit = 0;
               
-              // Adjust entry price for realistic fills
-              const realisticEntryCredit = entryCosts.netReceived / (greeksAdjustedSize * 100);
+              if (spread) {
+                entryCosts = this.calculateSpreadEntryCosts(
+                  spread,
+                  signal.action as 'BULL_PUT_SPREAD' | 'BEAR_CALL_SPREAD' | 'IRON_CONDOR',
+                  greeksAdjustedSize
+                );
+                
+                // Adjust entry price for realistic fills
+                realisticEntryCredit = entryCosts.netReceived / (greeksAdjustedSize * 100);
+              }
               
               // Check if trade is still profitable after transaction costs
               if (realisticEntryCredit <= 0.05) { // Minimum $0.05 credit after costs
@@ -704,11 +820,11 @@ export class BacktestEngine {
                 spread: spread,
                 daysHeld: 0,
                 // Greeks tracking
-                entryGreeks: spreadGreeks,
-                currentGreeks: spreadGreeks,
-                greeksHistory: [spreadGreeks],
-                maxLoss: spread.maxLoss * greeksAdjustedSize,
-                riskScore: Math.abs(spreadGreeks.delta) + Math.abs(spreadGreeks.vega / 100) + Math.abs(spreadGreeks.theta / 50),
+                entryGreeks: spreadGreeks || undefined,
+                currentGreeks: spreadGreeks || undefined,
+                greeksHistory: spreadGreeks ? [spreadGreeks] : [],
+                maxLoss: spread ? spread.maxLoss * greeksAdjustedSize : 0,
+                riskScore: spreadGreeks ? Math.abs(spreadGreeks.delta) + Math.abs(spreadGreeks.vega / 100) + Math.abs(spreadGreeks.theta / 50) : 0,
                 // Transaction cost tracking
                 entryFills: entryCosts.fills,
                 totalTransactionCosts: entryCosts.totalCost,
@@ -718,8 +834,12 @@ export class BacktestEngine {
               openPositions.push(position);
               
               // Enhanced logging with Greeks and transaction cost info
-              console.log(`📊 Greeks: Δ=${spreadGreeks.delta.toFixed(2)} Θ=${spreadGreeks.theta.toFixed(0)} 𝜈=${spreadGreeks.vega.toFixed(0)} Risk=${position.riskScore?.toFixed(1)}`);
-              console.log(`💰 Costs: Entry=$${entryCosts.totalCost.toFixed(2)}, Net Credit=$${realisticEntryCredit.toFixed(2)} (vs theoretical $${spread.netCredit.toFixed(2)})`);
+              if (spreadGreeks) {
+                console.log(`📊 Greeks: Δ=${spreadGreeks.delta.toFixed(2)} Θ=${spreadGreeks.theta.toFixed(0)} 𝜈=${spreadGreeks.vega.toFixed(0)} Risk=${position.riskScore?.toFixed(1)}`);
+              }
+              if (spread) {
+                console.log(`💰 Costs: Entry=$${entryCosts.totalCost.toFixed(2)}, Net Credit=$${realisticEntryCredit.toFixed(2)} (vs theoretical $${spread.netCredit.toFixed(2)})`);
+              }
               
               if (signal.action === 'BULL_PUT_SPREAD') {
                 const bullSpread = spread as BullPutSpread;

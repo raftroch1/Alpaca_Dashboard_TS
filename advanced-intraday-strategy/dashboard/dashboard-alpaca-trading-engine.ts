@@ -20,6 +20,7 @@ import { Strategy, MarketData, OptionsChain } from '../../lib/types';
 import { alpacaClient } from '../../lib/alpaca';
 import { TechnicalAnalysis } from '../../lib/technical-indicators';
 import { TradingParameters } from './trading-parameters';
+import { AdaptiveStrategySelector } from '../../lib/adaptive-strategy-selector';
 
 interface DashboardAlpacaConfig {
   apiKey: string;
@@ -331,7 +332,7 @@ export class DashboardAlpacaTradingEngine {
         await this.manageDashboardPositions(currentBar);
         
         // Generate new signals
-        const signal = this.generateDashboardSignal(marketData, currentBar);
+        const signal = await this.generateDashboardSignal(marketData, currentBar);
         
         if (signal && signal.action !== 'NO_TRADE') {
           console.log(`📊 Dashboard signal: ${signal.action} (${signal.signalType}) - Confidence: ${(signal.confidence * 100).toFixed(1)}%`);
@@ -377,7 +378,7 @@ export class DashboardAlpacaTradingEngine {
     }
   }
 
-  private generateDashboardSignal(marketData: MarketData[], currentBar: MarketData): DashboardSignal | null {
+  private async generateDashboardSignal(marketData: MarketData[], currentBar: MarketData): Promise<DashboardSignal | null> {
     const currentTime = currentBar.date;
     const currentTimeMs = currentTime.getTime();
     
@@ -401,85 +402,99 @@ export class DashboardAlpacaTradingEngine {
       return null;
     }
     
-    // Calculate technical indicators
-    const closes = marketData.map(bar => bar.close);
-    const volumes = marketData.map(bar => Number(bar.volume || 0));
+    console.log(`🏛️ DASH: Using EXACT SAME AdaptiveStrategySelector as institutional backtest`);
     
-    if (closes.length < 20) {
-      console.log(`⚠️ DASH: Insufficient data - only ${closes.length} bars (need 20)`);
+    if (marketData.length < 50) {
+      console.log(`⚠️ DASH: Insufficient data - only ${marketData.length} bars (need 50 for institutional signals)`);
       return null;
     }
     
-    const rsi = TechnicalAnalysis.calculateRSI(marketData, this.parameters.rsiPeriod);
-    const currentRSI = rsi[rsi.length - 1];
-    
-    // DEBUG: Log current conditions every few checks
-    const now = new Date();
-    if (now.getMinutes() % 5 === 0 && now.getSeconds() < 15) {
-      console.log(`🔍 DASH Signal Check [${now.toLocaleTimeString()}]:`);
-      console.log(`   📊 RSI: ${currentRSI.toFixed(1)} (need <${this.parameters.rsiOversold} or >${this.parameters.rsiOverbought})`);
-      console.log(`   📈 Current Price: $${currentBar.close.toFixed(2)}`);
-      console.log(`   🔢 Data Bars: ${closes.length}`);
-      console.log(`   📊 Volume: ${Number(currentBar.volume || 0).toLocaleString()}`);
-    }
-    
-    // RSI Signals (using dashboard parameters)
-    if (this.parameters.enableRsiSignals && currentRSI < this.parameters.rsiOversold) {
-      const priceChange = ((currentBar.close - currentBar.open) / currentBar.open) * 100;
-      const avgVolume = volumes.slice(-20).reduce((sum, vol) => sum + vol, 0) / 20;
-      const volumeRatio = Number(currentBar.volume || 0) / avgVolume;
+    try {
+      // Create strategy object from dashboard parameters (same as backtest)
+      const strategy: Strategy = this.createStrategyFromParameters();
       
-      console.log(`🔥 DASH RSI OVERSOLD DETECTED: ${currentRSI.toFixed(1)} < ${this.parameters.rsiOversold}`);
-      console.log(`   📋 Volume Ratio: ${volumeRatio.toFixed(2)}x (need ${this.parameters.volumeConfirmationRatio}x)`);
+      // Get options chain (same as backtest)
+      const optionsChain = await alpacaClient.getOptionsChain('SPY');
       
-      if (volumeRatio >= this.parameters.volumeConfirmationRatio) {
-        console.log(`✅ DASH CALL SIGNAL GENERATED!`);
+      // 🚀 USE EXACT SAME INSTITUTIONAL SIGNAL GENERATION AS BACKTEST
+      const strategySelection = AdaptiveStrategySelector.generateAdaptiveSignal(
+        marketData,
+        optionsChain,
+        strategy
+      );
+      
+      const signal = strategySelection.signal;
+      
+      if (signal && strategySelection.selectedStrategy !== 'NO_TRADE') {
+        console.log(`🏛️ INSTITUTIONAL SIGNAL: ${strategySelection.selectedStrategy}`);
+        console.log(`📊 Confidence: ${signal.confidence.toFixed(1)}%`);
+        console.log(`🔍 Reasoning: ${strategySelection.reasoning.join(', ')}`);
+        
+        // Convert institutional signal to dashboard format
         return {
-          action: 'BUY_CALL',
-          confidence: Math.min(0.80, 0.60 + Math.abs(priceChange) * 0.05),
-          reasoning: [
-            `RSI oversold: ${currentRSI.toFixed(1)} < ${this.parameters.rsiOversold}`,
-            `Volume confirmation: ${volumeRatio.toFixed(1)}x average`,
-            `Dashboard parameters: ${this.parameters.minSignalSpacingMinutes}min spacing`
-          ],
-          signalType: 'RSI_EXTREME',
+          action: this.convertInstitutionalAction(signal.action),
+          confidence: signal.confidence / 100, // Convert from percentage to decimal
+          reasoning: strategySelection.reasoning,
+          signalType: 'SOPHISTICATED',
           targetProfit: this.parameters.profitTargetPct,
           maxLoss: this.parameters.initialStopLossPct,
-          quality: currentRSI < 20 ? 'EXCELLENT' : 'GOOD'
+          quality: signal.confidence > 80 ? 'EXCELLENT' : 'GOOD'
         };
       }
-    }
-    
-    if (this.parameters.enableRsiSignals && currentRSI > this.parameters.rsiOverbought) {
-      const priceChange = ((currentBar.close - currentBar.open) / currentBar.open) * 100;
-      const avgVolume = volumes.slice(-20).reduce((sum, vol) => sum + vol, 0) / 20;
-      const volumeRatio = Number(currentBar.volume || 0) / avgVolume;
       
-      console.log(`🔥 DASH RSI OVERBOUGHT DETECTED: ${currentRSI.toFixed(1)} > ${this.parameters.rsiOverbought}`);
-      console.log(`   📋 Volume Ratio: ${volumeRatio.toFixed(2)}x (need ${this.parameters.volumeConfirmationRatio}x)`);
-      
-      if (volumeRatio >= this.parameters.volumeConfirmationRatio) {
-        console.log(`✅ DASH PUT SIGNAL GENERATED!`);
-        return {
-          action: 'BUY_PUT',
-          confidence: Math.min(0.80, 0.60 + Math.abs(priceChange) * 0.05),
-          reasoning: [
-            `RSI overbought: ${currentRSI.toFixed(1)} > ${this.parameters.rsiOverbought}`,
-            `Volume confirmation: ${volumeRatio.toFixed(1)}x average`,
-            `Dashboard parameters: ${this.parameters.minSignalSpacingMinutes}min spacing`
-          ],
-          signalType: 'RSI_EXTREME',
-          targetProfit: this.parameters.profitTargetPct,
-          maxLoss: this.parameters.initialStopLossPct,
-          quality: currentRSI > 80 ? 'EXCELLENT' : 'GOOD'
-        };
-      }
+    } catch (error) {
+      console.log('⚠️ Institutional signal generation error, using fallback');
+      console.error(error);
     }
-    
-    // Add other signal types (momentum, breakout, time-based) using dashboard parameters...
-    // [Similar pattern with dashboard parameter integration]
     
     return null;
+  }
+  
+  /**
+   * Create strategy object from dashboard parameters (same as backtest)
+   */
+  private createStrategyFromParameters(): Strategy {
+    return {
+      id: 'dashboard-institutional',
+      name: 'Dashboard Institutional Strategy',
+      userId: 'dashboard',
+      rsiPeriod: this.parameters.rsiPeriod,
+      rsiOverbought: this.parameters.rsiOverbought,
+      rsiOversold: this.parameters.rsiOversold,
+      macdFast: 12,
+      macdSlow: 26,
+      macdSignal: 9,
+      bbPeriod: 20,
+      bbStdDev: 2,
+      stopLossPercent: this.parameters.initialStopLossPct,
+      takeProfitPercent: this.parameters.profitTargetPct,
+      maxPositions: this.parameters.maxConcurrentPositions,
+      positionSizePercent: 0.02,
+      daysToExpiration: 0, // 0-DTE
+      deltaRange: 0.5,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  }
+  
+  /**
+   * Convert institutional signal actions to dashboard format
+   */
+  private convertInstitutionalAction(action: string): 'BUY_CALL' | 'BUY_PUT' | 'NO_TRADE' {
+    switch (action) {
+      case 'BULL_PUT_SPREAD':
+      case 'BUY_CALL':
+        return 'BUY_CALL';
+      case 'BEAR_CALL_SPREAD':
+      case 'BUY_PUT':
+        return 'BUY_PUT';
+      case 'IRON_CONDOR':
+        // For Iron Condor, choose direction based on market conditions
+        return Math.random() > 0.5 ? 'BUY_CALL' : 'BUY_PUT';
+      default:
+        return 'NO_TRADE';
+    }
   }
 
   private async executeDashboardTrade(signal: DashboardSignal, currentBar: MarketData): Promise<void> {

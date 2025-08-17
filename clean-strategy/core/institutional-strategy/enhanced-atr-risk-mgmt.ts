@@ -13,7 +13,7 @@
  * - Intraday volatility patterns
  */
 
-import { MarketData } from '../lib/types';
+import { MarketData } from '../../../lib/types';
 
 export interface ATRSnapshot {
   timestamp: Date;

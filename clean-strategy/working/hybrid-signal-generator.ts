@@ -9,9 +9,9 @@
  * ✅ 1-minute precision with realistic targets
  */
 
-import { MarketData, OptionsChain, Strategy, TechnicalIndicators } from '../lib/types';
-import CoherentStrategyFramework, { StrategySignal } from './coherent-strategy-framework';
-import { TechnicalAnalysis } from '../lib/technical-indicators';
+import { MarketData, OptionsChain, Strategy, TechnicalIndicators } from '../../lib/types';
+import CoherentStrategyFramework, { StrategySignal } from '../core/institutional-strategy/coherent-strategy-framework';
+import { TechnicalAnalysis } from '../../lib/technical-indicators';
 
 export interface HybridSignal {
   // Basic signal info

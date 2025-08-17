@@ -12,21 +12,34 @@
  * - Comprehensive risk management
  */
 
-import { MarketData, OptionsChain, Strategy, BacktestParams } from '../lib/types';
-import GammaExposureEngine from './gamma-exposure-engine';
-import AnchoredVolumeProfile from './anchored-volume-profile';
-import AnchoredVWAP from './anchored-vwap';
-import MicrofractalFibonacci from './microfractal-fibonacci';
-import EnhancedATRRiskManager from './enhanced-atr-risk-mgmt';
-import CoherentStrategyFramework from './coherent-strategy-framework';
-import EnhancedBacktestEngine from './enhanced-backtest-engine';
-import ComprehensiveRiskManager from './comprehensive-risk-management';
-import { 
-  TRADING_CONFIG_25K, 
-  displayPerformanceAnalysis, 
-  selectTradingProfile,
-  displayAllProfiles 
-} from './trading-config';
+import { MarketData, OptionsChain, Strategy, BacktestParams } from '../../lib/types';
+import GammaExposureEngine from '../core/institutional-strategy/gamma-exposure-engine';
+import AnchoredVolumeProfile from '../core/institutional-strategy/anchored-volume-profile';
+import AnchoredVWAP from '../core/institutional-strategy/anchored-vwap';
+import MicrofractalFibonacci from '../core/institutional-strategy/microfractal-fibonacci';
+import EnhancedATRRiskManager from '../core/institutional-strategy/enhanced-atr-risk-mgmt';
+import CoherentStrategyFramework from '../core/institutional-strategy/coherent-strategy-framework';
+import EnhancedBacktestEngine from '../core/institutional-strategy/enhanced-backtest-engine';
+import ComprehensiveRiskManager from '../core/institutional-strategy/comprehensive-risk-management';
+// Mock trading config for testing
+const TRADING_CONFIG_25K = {
+  initialCapital: 25000,
+  maxDailyLoss: 500,
+  maxPositions: 3,
+  riskPerTrade: 0.02
+};
+
+function displayPerformanceAnalysis(results: any) {
+  console.log('📊 Performance Analysis:', results);
+}
+
+function selectTradingProfile() {
+  return TRADING_CONFIG_25K;
+}
+
+function displayAllProfiles() {
+  console.log('Available profiles: 25K Account');
+}
 
 /**
  * Generate mock market data for testing

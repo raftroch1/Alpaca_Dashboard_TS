@@ -13,7 +13,7 @@
  * 5. Enhanced ATR → Dynamic risk management
  */
 
-import { MarketData, OptionsChain, TradeSignal, Strategy } from '../lib/types';
+import { MarketData, OptionsChain, TradeSignal, Strategy } from '../../../lib/types';
 import GammaExposureEngine, { GEXSnapshot } from './gamma-exposure-engine';
 import AnchoredVolumeProfile, { AVPSnapshot } from './anchored-volume-profile';
 import AnchoredVWAP, { AVWAPSnapshot } from './anchored-vwap';
