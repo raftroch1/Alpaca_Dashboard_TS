@@ -110,22 +110,16 @@ export class AlpacaHTTPClient {
       if (response.data.option_contracts) {
         response.data.option_contracts.forEach((contract: any) => {
           optionsChain.push({
-            id: contract.id,
             symbol: contract.symbol,
-            underlyingSymbol: contract.underlying_symbol,
             strike: contract.strike_price,
             expiration: new Date(contract.expiration_date),
-            type: contract.type.toLowerCase() as 'call' | 'put',
+            side: contract.type.toUpperCase() as 'CALL' | 'PUT',
             bid: 0, // Would need separate quote request
             ask: 0,
             volume: 0,
             openInterest: contract.open_interest || 0,
             impliedVolatility: 0.25, // Default estimate
-            delta: contract.type === 'call' ? 0.5 : -0.5,
-            gamma: 0.1,
-            theta: -0.05,
-            vega: 0.2,
-            createdAt: new Date()
+            delta: contract.type === 'call' ? 0.5 : -0.5
           });
         });
       }

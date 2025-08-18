@@ -299,7 +299,7 @@ export class DirectInstitutionalIntegration {
   private static scoreAVP(avp: AVPSnapshot, currentPrice: number): number {
     if (!avp.volumeNodes || avp.volumeNodes.length === 0) {
       // Give small base score if we have volume profile data but no clear nodes
-      return avp.pocPrice ? 0.1 : 0;
+      return avp.valueArea.poc ? 0.1 : 0;
     }
     
     // Find nearest HVN (High Volume Node) for support/resistance
@@ -309,13 +309,13 @@ export class DirectInstitutionalIntegration {
       // No HVNs found, but check position relative to POC and Value Area
       let score = 0.1; // Base score for having volume profile data
       
-      if (avp.pocPrice) {
-        const pocDistance = Math.abs(avp.pocPrice - currentPrice) / currentPrice;
+      if (avp.valueArea.poc) {
+        const pocDistance = Math.abs(avp.valueArea.poc - currentPrice) / currentPrice;
         if (pocDistance < 0.002) score += 0.2; // Near POC
       }
       
-      if (avp.valueAreaHigh && avp.valueAreaLow) {
-        if (currentPrice >= avp.valueAreaLow && currentPrice <= avp.valueAreaHigh) {
+      if (avp.valueArea.high && avp.valueArea.low) {
+        if (currentPrice >= avp.valueArea.low && currentPrice <= avp.valueArea.high) {
           score += 0.2; // Inside value area
         }
       }

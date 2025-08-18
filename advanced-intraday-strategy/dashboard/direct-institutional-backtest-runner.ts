@@ -54,7 +54,7 @@ export class DirectInstitutionalBacktestRunner {
 
     try {
       // Use REAL Alpaca historical data instead of mock data
-      const { alpacaClient } = await import('../../lib/alpaca');
+      const { alpacaHTTPClient } = await import('../../lib/alpaca-http-client');
       
       // Calculate date range for real data
       const endDate = new Date();
@@ -66,7 +66,7 @@ export class DirectInstitutionalBacktestRunner {
       // Fetch ONLY real market data from Alpaca (NO MOCK DATA FALLBACK)
       let marketData;
       try {
-        marketData = await alpacaClient.getMarketData('SPY', startDate, endDate, timeframe);
+        marketData = await alpacaHTTPClient.getMarketData('SPY', startDate, endDate, timeframe);
         
         if (marketData.length < 10) {
           throw new Error(`Insufficient real data: only ${marketData.length} bars retrieved. Minimum 10 required.`);
@@ -112,13 +112,24 @@ export class DirectInstitutionalBacktestRunner {
         const currentData = marketData.slice(0, i + 1);
         
         try {
-          // Use our proven DirectInstitutionalIntegration with RELAXED config for real data
-          const { RELAXED_TRADING_CONFIG } = await import('../../clean-strategy/core/institutional-strategy/relaxed-coherent-config');
+          // Use our proven DirectInstitutionalIntegration with relaxed config for real data
+          const relaxedDirectConfig = {
+            gexWeight: 0.30,
+            avpWeight: 0.20,
+            avwapWeight: 0.20,
+            fractalWeight: 0.20,
+            atrWeight: 0.10,
+            minimumBullishScore: 0.5,  // Relaxed from 0.7
+            minimumBearishScore: 0.5,
+            riskMultiplier: 1.0,
+            maxPositionSize: 0.02
+          };
           
           const signal = await DirectInstitutionalIntegration.generateDirectSignal(
             currentData,
             optionsChain,
-            RELAXED_TRADING_CONFIG  // Use relaxed thresholds (0.5 vs 0.7 confluence)
+            25000,  // Account balance
+            relaxedDirectConfig  // Use relaxed thresholds (0.5 vs 0.7 confluence)
           );
           
           if (signal && signal.action !== 'NO_TRADE') {

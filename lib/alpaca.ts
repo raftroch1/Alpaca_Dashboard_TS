@@ -100,8 +100,11 @@ class AlpacaClient {
   
   async getCurrentPrice(symbol: string): Promise<number> {
     try {
-      const latestTrade = await this.alpaca.getLatestTrade(symbol);
-      return latestTrade.Price || 0;
+      // Get latest market data for current price
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000); // Last 24 hours
+      const marketData = await this.getMarketData(symbol, startDate, endDate, '1Day');
+      return marketData.length > 0 ? marketData[marketData.length - 1].close : 450;
     } catch (error) {
       console.error(`❌ Error fetching current price for ${symbol}:`, error);
       return 450; // Default SPY price for fallback
@@ -297,22 +300,24 @@ class AlpacaClient {
     try {
       console.log(`📋 Submitting ${order.side} order for ${order.quantity} ${order.symbol}`);
       
-      const alpacaOrder = await this.alpaca.createOrder({
+      const response = await axios.post(`${this.credentials.baseUrl}/v2/orders`, {
         symbol: order.symbol,
         qty: order.quantity,
         side: order.side,
         type: order.type,
         time_in_force: order.timeInForce,
         limit_price: order.limitPrice,
+      }, {
+        headers: this.getHeaders()
       });
 
-      console.log(`✅ Order submitted successfully: ${alpacaOrder.id}`);
+      console.log(`✅ Order submitted successfully: ${response.data.id}`);
       
       return {
-        id: alpacaOrder.id,
-        status: alpacaOrder.status,
-        filledPrice: alpacaOrder.filled_avg_price || order.limitPrice || 0,
-        filledAt: new Date(alpacaOrder.filled_at || Date.now())
+        id: response.data.id,
+        status: response.data.status,
+        filledPrice: response.data.filled_avg_price || order.limitPrice || 0,
+        filledAt: new Date(response.data.filled_at || Date.now())
       };
       
     } catch (error) {
@@ -324,7 +329,10 @@ class AlpacaClient {
   // Get account information
   async getAccount() {
     try {
-      return await this.alpaca.getAccount();
+      const response = await axios.get(`${this.credentials.baseUrl}/v2/account`, {
+        headers: this.getHeaders()
+      });
+      return response.data;
     } catch (error) {
       console.error('❌ Error fetching account:', error);
       throw error;
