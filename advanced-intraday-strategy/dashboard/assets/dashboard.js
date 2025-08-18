@@ -16,7 +16,9 @@ class TradingDashboard {
         this.initializeUI();
         this.initializeWebSocket();
         this.bindEvents();
-        this.loadPreset('balanced'); // Start with balanced preset
+        
+        // 💾 Load saved parameters or use balanced preset
+        this.loadSavedParametersOrDefault();
         this.initializeAdvancedControls(); // Initialize advanced controls with defaults
     }
 
@@ -225,6 +227,9 @@ class TradingDashboard {
         if (element.id === 'usePartialProfitTaking') {
             this.updatePartialProfitControls();
         }
+        
+        // 💾 Save parameters to localStorage
+        this.saveParametersToStorage();
     }
 
     updatePartialProfitControls() {
@@ -384,6 +389,10 @@ class TradingDashboard {
             });
 
             this.updatePartialProfitControls();
+            
+            // 💾 Save preset parameters to localStorage
+            this.saveParametersToStorage();
+            
             this.addLog(`Loaded ${presetName.toUpperCase()} preset`, 'success');
         }
     }
@@ -416,6 +425,10 @@ class TradingDashboard {
             
             valueSpan.textContent = displayValue;
         }
+        
+        // Update current config and save to localStorage
+        this.currentConfig[input.id] = parseFloat(input.value);
+        this.saveParametersToStorage();
     }
 
     getAdvancedDefaults() {
@@ -760,6 +773,111 @@ class TradingDashboard {
         });
         
         return config;
+    }
+    
+    // 💾 PARAMETER PERSISTENCE METHODS
+    saveParametersToStorage() {
+        try {
+            const config = this.gatherCurrentConfig();
+            localStorage.setItem('dashboardTradingParameters', JSON.stringify(config));
+            console.log('💾 Parameters saved to localStorage');
+            
+            // Show brief visual confirmation
+            this.showSaveConfirmation();
+        } catch (error) {
+            console.error('❌ Failed to save parameters:', error);
+        }
+    }
+    
+    showSaveConfirmation() {
+        // Create or update save indicator
+        let indicator = document.getElementById('saveIndicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'saveIndicator';
+            indicator.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 255, 0, 0.8);
+                color: white;
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-size: 12px;
+                z-index: 1000;
+                transition: opacity 0.3s;
+            `;
+            document.body.appendChild(indicator);
+        }
+        
+        indicator.textContent = '💾 Saved';
+        indicator.style.opacity = '1';
+        
+        // Fade out after 1 second
+        setTimeout(() => {
+            indicator.style.opacity = '0';
+        }, 1000);
+    }
+    
+    loadSavedParametersOrDefault() {
+        try {
+            const savedParams = localStorage.getItem('dashboardTradingParameters');
+            
+            if (savedParams) {
+                const config = JSON.parse(savedParams);
+                console.log('💾 Loading saved parameters from localStorage');
+                this.applySavedParameters(config);
+                this.addLog('Loaded previous session parameters', 'success');
+            } else {
+                console.log('💾 No saved parameters found, using balanced preset');
+                this.loadPreset('balanced'); // Start with balanced preset
+            }
+        } catch (error) {
+            console.error('❌ Failed to load saved parameters:', error);
+            this.loadPreset('balanced'); // Fallback to balanced preset
+        }
+    }
+    
+    applySavedParameters(config) {
+        // Apply saved configuration to UI elements
+        Object.keys(config).forEach(key => {
+            const element = document.getElementById(key);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = config[key];
+                } else if (element.type === 'number' || element.type === 'range') {
+                    // Convert decimal values back to percentages for display
+                    const percentageFields = [
+                        'initialStopLossPct', 'profitTargetPct', 'trailActivationPct', 
+                        'trailStopPct', 'maxRiskPerTradePct', 'maxDrawdownPct',
+                        'partialProfitLevel', 'partialProfitSize', 'momentumThresholdPct',
+                        'breakoutThresholdPct'
+                    ];
+                    
+                    if (percentageFields.includes(key) && config[key] < 1) {
+                        element.value = (config[key] * 100).toString();
+                    } else {
+                        element.value = config[key].toString();
+                    }
+                    
+                    // Update range slider displays
+                    const valueDisplay = document.getElementById(key + 'Value');
+                    if (valueDisplay) {
+                        valueDisplay.textContent = element.value;
+                    }
+                } else {
+                    element.value = config[key];
+                }
+                
+                // Update currentConfig
+                this.currentConfig[key] = config[key];
+            }
+        });
+        
+        // Update partial profit controls visibility
+        this.updatePartialProfitControls();
+        
+        console.log('✅ Saved parameters applied to dashboard');
     }
 
     sendMessage(message) {

@@ -547,16 +547,24 @@ export class DashboardAlpacaTradingEngine {
       // Generate dashboard-specific client order ID
       const clientOrderId = `${this.TRADE_PREFIX}${this.SYMBOL}_${Date.now()}`;
       
-      // Calculate option symbol for real order
+      // Generate proper Alpaca option symbol format
       const strike = this.calculateStrike(currentPrice, signal.action as 'BUY_CALL' | 'BUY_PUT');
       const today = new Date();
-      const expiry = `${today.getFullYear().toString().slice(-2)}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+      
+      // Use proper Alpaca option symbol format: SPY240818C00643000
+      const year = today.getFullYear().toString().slice(-2);
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
       const optionType = signal.action === 'BUY_CALL' ? 'C' : 'P';
-      const optionSymbol = `SPY${expiry}${String(strike * 1000).padStart(8, '0')}${optionType}`;
+      const strikeFormatted = String(Math.round(strike * 1000)).padStart(8, '0');
+      const optionSymbol = `SPY${year}${month}${day}${optionType}${strikeFormatted}`;
+      
+      console.log(`🔧 Generated option symbol: ${optionSymbol} (Fixed Alpaca format)`);
+      const actualStrike = strike;
       
       console.log(`🎯 DASH Submitting REAL Order: ${signal.action} ${quantity} contracts`);
       console.log(`📋 Option Symbol: ${optionSymbol}`);
-      console.log(`💰 Strike: $${strike}, Risk: $${maxRisk.toFixed(2)}`);
+      console.log(`💰 Strike: $${actualStrike}, Risk: $${maxRisk.toFixed(2)}`);
       
       // 🚨 SUBMIT ACTUAL ORDER TO ALPACA (same as main strategy)
       const order = await this.alpaca.createOrder({
@@ -578,19 +586,27 @@ export class DashboardAlpacaTradingEngine {
         timestamp: currentBar.date,
         action: signal.action,
         symbol: optionSymbol,
-        strike,
+        strike: actualStrike,
         entryPrice: estimatedOptionPrice,
         quantity,
         signalType: signal.signalType,
         status: 'SUBMITTED'
       };
       
+      // ✅ CRITICAL FIX: Only track successful orders
       this.activeTrades.push(trade);
       this.dailyTradesGenerated++;
       this.lastSignalTime = currentBar.date.getTime();
       
-    } catch (error) {
+      console.log(`📈 Trade added to tracking: ${this.activeTrades.length}/${this.parameters.maxConcurrentPositions} active`);
+      
+    } catch (error: any) {
       console.error('❌ Dashboard trade execution error:', error);
+      console.log('🚫 Order failed - not adding to active trades to prevent position blocking');
+      
+      if (error.response && error.response.data) {
+        console.log(`🔍 Alpaca Error: ${error.response.data.message} (Code: ${error.response.data.code})`);
+      }
     }
   }
 
@@ -609,14 +625,25 @@ export class DashboardAlpacaTradingEngine {
     // Update order statuses with real Alpaca data
     await this.updateDashboardOrderStatuses();
     
-    const filledTrades = this.activeTrades.filter(t => t.status === 'FILLED');
-    if (filledTrades.length > 0) {
+    // Get real Alpaca positions to check P&L
+    const alpacaPositions = await this.alpaca.getPositions();
+    const dashboardPositions = alpacaPositions.filter((pos: any) => 
+      pos.symbol.includes('SPY') && pos.qty !== '0'
+    );
+    
+    if (dashboardPositions.length > 0) {
       const now = new Date();
-      console.log(`🔍 [${now.toLocaleTimeString()}] Dashboard checking exits for ${filledTrades.length} active trades`);
+      console.log(`🔍 [${now.toLocaleTimeString()}] REAL POSITION CHECK - ${dashboardPositions.length} active positions`);
       console.log(`📊 Current SPY Price: $${currentBar.close.toFixed(2)}`);
+      
+      // Check each real Alpaca position for exit conditions
+      for (const position of dashboardPositions) {
+        await this.checkRealPositionExit(position, currentBar);
+      }
     }
     
-    // Position management with dashboard parameters
+    // Also check our internal trade tracking
+    const filledTrades = this.activeTrades.filter(t => t.status === 'FILLED');
     for (const trade of filledTrades) {
       await this.checkDashboardTradeExits(trade, currentBar);
     }
@@ -743,13 +770,127 @@ export class DashboardAlpacaTradingEngine {
     }
   }
 
+  private async checkRealPositionExit(position: any, currentBar: MarketData): Promise<void> {
+    try {
+      const symbol = position.symbol;
+      const quantity = Math.abs(parseInt(position.qty));
+      const marketValue = parseFloat(position.market_value);
+      const totalPnL = parseFloat(position.unrealized_pl);
+      const costBasis = parseFloat(position.cost_basis);
+      const currentPrice = marketValue / (quantity * 100); // Per-contract price
+      
+      console.log(`🔍 REAL POSITION: ${symbol}`);
+      console.log(`   💰 Market Value: $${marketValue} | P&L: $${totalPnL.toFixed(2)}`);
+      console.log(`   📊 Cost Basis: $${costBasis} | Current: $${currentPrice.toFixed(2)}`);
+      
+      // Calculate percentage P&L
+      const pnlPercent = totalPnL / Math.abs(costBasis);
+      
+      console.log(`   📈 P&L%: ${(pnlPercent * 100).toFixed(1)}%`);
+      
+      // CHECK STOP LOSS (35% loss)
+      if (pnlPercent <= -this.parameters.initialStopLossPct) {
+        console.log(`🛑 STOP LOSS TRIGGERED: ${(pnlPercent * 100).toFixed(1)}% <= -${(this.parameters.initialStopLossPct * 100).toFixed(0)}%`);
+        await this.closeAlpacaPosition(symbol, quantity, 'STOP_LOSS');
+        return;
+      }
+      
+      // CHECK PROFIT TARGET (50% gain)
+      if (pnlPercent >= this.parameters.profitTargetPct) {
+        console.log(`🎯 PROFIT TARGET HIT: ${(pnlPercent * 100).toFixed(1)}% >= ${(this.parameters.profitTargetPct * 100).toFixed(0)}%`);
+        await this.closeAlpacaPosition(symbol, quantity, 'PROFIT_TARGET');
+        return;
+      }
+      
+      // CHECK TIME-BASED EXIT (3:30 PM for 0-DTE)
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      const timeDecimal = hour + (minute / 60);
+      
+      if (timeDecimal >= this.parameters.forceExitTime) {
+        console.log(`⏰ FORCE EXIT TIME: ${hour}:${minute.toString().padStart(2, '0')} >= ${this.parameters.forceExitTime}`);
+        await this.closeAlpacaPosition(symbol, quantity, 'TIME_EXIT');
+        return;
+      }
+      
+    } catch (error) {
+      console.error('❌ Error checking real position exit:', error);
+    }
+  }
+
+  private async closeAlpacaPosition(symbol: string, quantity: number, reason: string): Promise<void> {
+    try {
+      console.log(`🚪 CLOSING POSITION: ${symbol} (${quantity} contracts) - ${reason}`);
+      
+      // Get current position P&L from Alpaca before closing
+      const positions = await this.alpaca.getPositions();
+      const position = positions.find((pos: any) => pos.symbol === symbol);
+      
+      let pnl = 0;
+      if (position) {
+        pnl = parseFloat(position.unrealized_pl);
+        console.log(`💰 Position P&L: $${pnl.toFixed(2)}`);
+      }
+      
+      // Submit sell order to close position
+      const closeOrder = await this.alpaca.createOrder({
+        symbol: symbol,
+        qty: quantity.toString(),
+        side: 'sell',
+        type: 'market',
+        time_in_force: 'day',
+        client_order_id: `${this.TRADE_PREFIX}CLOSE_${Date.now()}`
+      });
+      
+      console.log(`✅ CLOSE ORDER SUBMITTED: ${closeOrder.id}`);
+      
+      // Find and move the trade to completed with P&L
+      const tradeIndex = this.activeTrades.findIndex(t => t.symbol === symbol);
+      if (tradeIndex !== -1) {
+        const trade = this.activeTrades[tradeIndex];
+        trade.pnl = pnl;
+        trade.status = 'FILLED'; // Mark as completed
+        
+        // Move to completed trades for win rate calculation
+        this.completedTrades.push(trade);
+        this.activeTrades.splice(tradeIndex, 1);
+        
+        console.log(`📊 Trade completed: ${symbol} → P&L: $${pnl.toFixed(2)} (${reason})`);
+        console.log(`🎯 Updated stats: ${this.completedTrades.length} completed, ${this.activeTrades.length} active`);
+      } else {
+        console.log(`⚠️ Trade not found in activeTrades for symbol: ${symbol}`);
+      }
+      
+    } catch (error) {
+      console.error(`❌ Failed to close position ${symbol}:`, error);
+    }
+  }
+
   private async exitDashboardTrade(trade: DashboardTrade, reason: string): Promise<void> {
     try {
       console.log(`🚪 Dashboard trade exit: ${trade.clientOrderId} - ${reason}`);
       
+      // Get current P&L from Alpaca position if available
+      if (!trade.pnl) {
+        const positions = await this.alpaca.getPositions();
+        const position = positions.find((pos: any) => pos.symbol === trade.symbol);
+        
+        if (position) {
+          trade.pnl = parseFloat(position.unrealized_pl);
+          console.log(`💰 Final P&L: $${trade.pnl.toFixed(2)}`);
+        } else {
+          // Fallback: estimate P&L if no position found
+          trade.pnl = 0;
+          console.log(`⚠️ No position found for P&L calculation, setting to $0`);
+        }
+      }
+      
       // Move to completed trades
       this.activeTrades = this.activeTrades.filter(t => t.id !== trade.id);
       this.completedTrades.push(trade);
+      
+      console.log(`📊 Trade moved to completed: ${this.completedTrades.length} total completed`);
       
     } catch (error) {
       console.error('❌ Dashboard trade exit error:', error);
