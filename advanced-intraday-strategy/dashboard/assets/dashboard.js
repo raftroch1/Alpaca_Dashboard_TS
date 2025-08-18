@@ -712,6 +712,7 @@ class TradingDashboard {
             'breakoutThresholdPct'
         ];
         
+        // Gather basic parameters
         Object.keys(this.currentConfig).forEach(key => {
             const element = document.getElementById(key);
             if (element) {
@@ -731,6 +732,29 @@ class TradingDashboard {
                     config[key] = value === 'null' ? null : 
                                  value === 'true' ? true : 
                                  value === 'false' ? false : value;
+                }
+            }
+        });
+        
+        // 🏛️ ADD INSTITUTIONAL PARAMETERS FROM ADVANCED CONTROLS
+        const institutionalParams = [
+            'gexWeight', 'avpWeight', 'avwapWeight', 'fractalWeight', 'atrWeight',
+            'minimumBullishScore', 'minimumBearishScore', 'confluenceMinimumScore',
+            'gexConfidenceThreshold', 'atrPeriod', 'customStopMultiplier',
+            'positionSizeMultiplier', 'maxCorrelatedPositions', 'portfolioHeatThreshold',
+            'emergencyStopLoss'
+        ];
+        
+        institutionalParams.forEach(param => {
+            const element = document.getElementById(param);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    config[param] = element.checked;
+                } else if (element.type === 'range' || element.type === 'number') {
+                    config[param] = parseFloat(element.value);
+                } else {
+                    const value = element.value;
+                    config[param] = value === 'true' ? true : value === 'false' ? false : value;
                 }
             }
         });

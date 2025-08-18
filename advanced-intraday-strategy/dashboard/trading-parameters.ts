@@ -62,6 +62,17 @@ export interface TradingParameters {
   enableGreeksMonitoring: boolean;  // true (real-time Greeks tracking)
   portfolioRiskLimit: number;       // 10.0 (10% max portfolio risk)
   dailyLossLimit: number;           // 500 (max daily loss limit)
+  
+  // 🎯 DirectIntegrationConfig Parameters (for paper trading)
+  gexWeight?: number;               // 0.30 (GEX component weight)
+  avpWeight?: number;               // 0.20 (AVP component weight)
+  avwapWeight?: number;             // 0.20 (AVWAP component weight)
+  fractalWeight?: number;           // 0.20 (Fractal component weight)
+  atrWeight?: number;               // 0.10 (ATR component weight)
+  minimumBullishScore?: number;     // 0.5 (minimum bullish confluence score)
+  minimumBearishScore?: number;     // 0.5 (minimum bearish confluence score)
+  riskMultiplier?: number;          // 1.0 (risk adjustment multiplier)
+  maxPositionSize?: number;         // 0.02 (max position size as % of account)
 }
 
 export interface TradingPreset {
@@ -179,7 +190,18 @@ export class ParameterPresets {
       minConfidenceLevel: 0.6, // Standard confidence
       enableGreeksMonitoring: true,
       portfolioRiskLimit: 10.0, // Standard risk
-      dailyLossLimit: 500
+      dailyLossLimit: 500,
+      
+      // DirectIntegrationConfig parameters (SAME AS WORKING BACKTEST)
+      gexWeight: 0.30,
+      avpWeight: 0.20,
+      avwapWeight: 0.20,
+      fractalWeight: 0.20,
+      atrWeight: 0.10,
+      minimumBullishScore: 0.5,  // Relaxed from 0.7 (same as backtest)
+      minimumBearishScore: 0.5,
+      riskMultiplier: 1.0,
+      maxPositionSize: 0.02
     }
   };
 

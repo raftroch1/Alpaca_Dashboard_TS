@@ -402,7 +402,7 @@ export class DashboardAlpacaTradingEngine {
       return null;
     }
     
-    console.log(`🏛️ DASH: Using DirectInstitutionalIntegration (PROVEN)`);
+    console.log(`🏛️ DASH: Using DirectInstitutionalIntegration (SAME AS BACKTEST)`);
     
     if (marketData.length < 50) {
       console.log(`⚠️ DASH: Insufficient data - only ${marketData.length} bars (need 50 for institutional signals)`);
@@ -413,18 +413,35 @@ export class DashboardAlpacaTradingEngine {
       // Get options chain
       const optionsChain = await alpacaHTTPClient.getOptionsChain('SPY');
       
-      // 🚀 USE OUR PROVEN DirectInstitutionalIntegration
-      const DirectInstitutionalIntegration = await import('../../clean-strategy/core/institutional-strategy/direct-institutional-integration');
-      const signal = await DirectInstitutionalIntegration.default.generateDirectSignal(
+      // 🚀 USE EXACT SAME METHOD AS BACKTEST - DirectInstitutionalIntegration
+      const { DirectInstitutionalIntegration } = await import('../../clean-strategy/core/institutional-strategy/direct-institutional-integration');
+      
+      // Use EXACT SAME config as backtest - read from dashboard parameters
+      const institutionalConfig = {
+        gexWeight: this.parameters.gexWeight || 0.30,
+        avpWeight: this.parameters.avpWeight || 0.20,
+        avwapWeight: this.parameters.avwapWeight || 0.20,
+        fractalWeight: this.parameters.fractalWeight || 0.20,
+        atrWeight: this.parameters.atrWeight || 0.10,
+        minimumBullishScore: this.parameters.minimumBullishScore || 0.5,
+        minimumBearishScore: this.parameters.minimumBearishScore || 0.5,
+        riskMultiplier: this.parameters.riskMultiplier || 1.0,
+        maxPositionSize: this.parameters.maxPositionSize || 0.02
+      };
+      
+      const signal = await DirectInstitutionalIntegration.generateDirectSignal(
         marketData,
-        optionsChain
+        optionsChain,
+        25000,  // Account balance (same as backtest)
+        institutionalConfig  // Same config as backtest, read from dashboard
       );
       
       if (signal && signal.action !== 'NO_TRADE') {
         
-        console.log(`🏛️ DIRECT INSTITUTIONAL SIGNAL: ${signal.action}`);
-        console.log(`📊 Confidence: ${(signal.confidence * 100).toFixed(1)}%`);
+        console.log(`🏛️ PAPER TRADING - INSTITUTIONAL SIGNAL: ${signal.action}`);
+        console.log(`📊 Confidence: ${(signal.confidence * 100).toFixed(1)}% (SAME AS BACKTEST)`);
         console.log(`🔍 Reasoning: ${signal.reasoning}`);
+        console.log(`🎯 Using: GEX(${institutionalConfig.gexWeight}), AVP(${institutionalConfig.avpWeight}), AVWAP(${institutionalConfig.avwapWeight}), Fractals(${institutionalConfig.fractalWeight}), ATR(${institutionalConfig.atrWeight})`);
         
         // Map our DirectInstitutional signals to dashboard format
         let dashboardAction: 'BUY_CALL' | 'BUY_PUT' | 'NO_TRADE';
@@ -442,20 +459,20 @@ export class DashboardAlpacaTradingEngine {
             dashboardAction = 'NO_TRADE';
         }
 
-        // Convert to dashboard format
+        // Convert to dashboard format (same confidence and reasoning as backtest)
         return {
           action: dashboardAction,
           confidence: signal.confidence,
           reasoning: [signal.reasoning],
-          signalType: 'SOPHISTICATED',
+          signalType: 'SOPHISTICATED',  // Using sophisticated for institutional signals
           targetProfit: this.parameters.profitTargetPct,
           maxLoss: this.parameters.initialStopLossPct,
-          quality: signal.confidence > 0.8 ? 'EXCELLENT' : 'GOOD'
+          quality: signal.confidence > 0.8 ? 'EXCELLENT' : signal.confidence > 0.6 ? 'GOOD' : 'FAIR'
         };
       }
       
     } catch (error) {
-      console.log('⚠️ Direct institutional signal generation error, using fallback');
+      console.log('⚠️ Direct institutional signal generation error');
       console.error(error);
     }
     
@@ -754,7 +771,11 @@ export class DashboardAlpacaTradingEngine {
     const winningTrades = this.completedTrades.filter(t => (t.pnl || 0) > 0).length;
     const winRate = this.completedTrades.length > 0 ? winningTrades / this.completedTrades.length : 0;
     
-    console.log(`📊 Dashboard Status: P&L: $${totalPnL.toFixed(2)}, Active: ${this.activeTrades.length}, Win Rate: ${(winRate * 100).toFixed(1)}%`);
+    console.log(`📊 INSTITUTIONAL PAPER TRADING STATUS:`);
+    console.log(`   💰 P&L: $${totalPnL.toFixed(2)} (Target: $${this.parameters.dailyPnLTarget})`);
+    console.log(`   📈 Active Positions: ${this.activeTrades.length}/${this.parameters.maxConcurrentPositions}`);
+    console.log(`   🎯 Win Rate: ${(winRate * 100).toFixed(1)}% (Backtest: 50.9%)`);
+    console.log(`   🏛️ Features: GEX(${this.parameters.gexWeight || 0.30}), AVP(${this.parameters.avpWeight || 0.20}), AVWAP(${this.parameters.avwapWeight || 0.20}), Fractals(${this.parameters.fractalWeight || 0.20})`);
   }
 
   async getDashboardStats(): Promise<any> {
