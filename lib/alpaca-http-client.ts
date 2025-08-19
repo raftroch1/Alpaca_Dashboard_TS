@@ -93,7 +93,7 @@ export class AlpacaHTTPClient {
     }
   }
 
-  async getOptionsChain(symbol: string): Promise<OptionsChain[]> {
+  async getOptionsChain(symbol: string, historicalDate?: Date): Promise<OptionsChain[]> {
     try {
       console.log(`📊 Fetching REAL options chain for ${symbol}`);
       

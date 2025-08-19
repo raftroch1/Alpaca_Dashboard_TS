@@ -536,19 +536,53 @@ export class DashboardAlpacaTradingEngine {
       const accountInfo = await this.alpaca.getAccount();
       const portfolioValue = parseFloat(accountInfo.portfolio_value);
       
-      // Use dashboard risk parameters (same as main but with dashboard parameters)
-      const maxRisk = Math.min(300, portfolioValue * this.parameters.maxRiskPerTradePct);
+      // 🎯 RESPECT DASHBOARD MAX RISK PER TRADE SETTING
+      const maxRiskPerTrade = portfolioValue * this.parameters.maxRiskPerTradePct;
       const currentPrice = currentBar.close;
       
-      // Calculate position size (same logic as main strategy)
-      const estimatedOptionPrice = currentPrice * 0.10; // Rough estimate
-      const quantity = Math.max(2, Math.min(4, Math.floor(maxRisk / (estimatedOptionPrice * 100))));
+      console.log(`💰 POSITION SIZING - RESPECTING YOUR SETTINGS:`);
+      console.log(`   Portfolio Value: $${portfolioValue.toLocaleString()}`);
+      console.log(`   Max Risk Per Trade Setting: ${(this.parameters.maxRiskPerTradePct * 100).toFixed(1)}%`);
+      console.log(`   Max Risk Per Trade: $${maxRiskPerTrade.toFixed(2)}`);
+      
+      // Better option price estimation for 0-DTE
+      const strike = this.calculateStrike(currentPrice, signal.action as 'BUY_CALL' | 'BUY_PUT');
+      const strikeDistance = Math.abs(currentPrice - strike) / currentPrice;
+      
+      // FIXED: Realistic 0-DTE option pricing (dollar amounts per share)
+      let estimatedOptionPrice;
+      if (strikeDistance < 0.002) { // Very close to ATM (within $1-2)
+        estimatedOptionPrice = 2.00; // $2.00 per share for ATM 0-DTE
+      } else if (strikeDistance < 0.008) { // Near ATM (within $5)
+        estimatedOptionPrice = 1.25; // $1.25 per share for near ATM
+      } else if (strikeDistance < 0.020) { // Moderate OTM
+        estimatedOptionPrice = 0.75; // $0.75 per share for moderate OTM
+      } else { // Far OTM
+        estimatedOptionPrice = 0.35; // $0.35 per share for far OTM
+      }
+      
+      // Calculate quantity to stay within YOUR risk limit (no hard-coded caps)
+      const maxQuantity = Math.floor(maxRiskPerTrade / (estimatedOptionPrice * 100));
+      const quantity = Math.max(1, maxQuantity); // At least 1 contract, but respect your limit
+      
+      const actualRisk = quantity * estimatedOptionPrice * 100;
+      
+      console.log(`   Strike: $${strike.toFixed(2)} (${(strikeDistance * 100).toFixed(2)}% from current)`);
+      console.log(`   Estimated Option Price: $${estimatedOptionPrice.toFixed(2)}`);
+      console.log(`   Calculated Quantity: ${quantity} contracts`);
+      console.log(`   Actual Position Risk: $${actualRisk.toFixed(2)}`);
+      console.log(`   ✅ Within Risk Limit: ${actualRisk <= maxRiskPerTrade ? 'YES' : 'NO'}`);
+      
+      // Safety check - reject if position would exceed risk limit
+      if (actualRisk > maxRiskPerTrade) {
+        console.log(`🚫 POSITION REJECTED - Would exceed max risk of $${maxRiskPerTrade.toFixed(2)}`);
+        return;
+      }
       
       // Generate dashboard-specific client order ID
       const clientOrderId = `${this.TRADE_PREFIX}${this.SYMBOL}_${Date.now()}`;
       
       // Generate proper Alpaca option symbol format
-      const strike = this.calculateStrike(currentPrice, signal.action as 'BUY_CALL' | 'BUY_PUT');
       const today = new Date();
       
       // Use proper Alpaca option symbol format: SPY240818C00643000
@@ -564,7 +598,7 @@ export class DashboardAlpacaTradingEngine {
       
       console.log(`🎯 DASH Submitting REAL Order: ${signal.action} ${quantity} contracts`);
       console.log(`📋 Option Symbol: ${optionSymbol}`);
-      console.log(`💰 Strike: $${actualStrike}, Risk: $${maxRisk.toFixed(2)}`);
+      console.log(`💰 Strike: $${actualStrike}, Risk: $${actualRisk.toFixed(2)} (Max: $${maxRiskPerTrade.toFixed(2)})`);
       
       // 🚨 SUBMIT ACTUAL ORDER TO ALPACA (same as main strategy)
       const order = await this.alpaca.createOrder({
