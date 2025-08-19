@@ -500,12 +500,12 @@ export class DashboardAlpacaTradingEngine {
       // 🚀 USE EXACT SAME METHOD AS BACKTEST - DirectInstitutionalIntegration
       const { DirectInstitutionalIntegration } = await import('../../clean-strategy/core/institutional-strategy/direct-institutional-integration');
       
-      // Use EXACT SAME config as backtest - read from dashboard parameters
+      // Use EXACT SAME config as backtest - GEX DISABLED for trend following
       const institutionalConfig = {
-        gexWeight: this.parameters.gexWeight || 0.30,
-        avpWeight: this.parameters.avpWeight || 0.20,
-        avwapWeight: this.parameters.avwapWeight || 0.20,
-        fractalWeight: this.parameters.fractalWeight || 0.20,
+        gexWeight: 0.0,   // FORCE DISABLED - was causing bullish bias
+        avpWeight: this.parameters.avpWeight || 0.25,
+        avwapWeight: this.parameters.avwapWeight || 0.40,  // MAJOR WEIGHT - trend following
+        fractalWeight: this.parameters.fractalWeight || 0.25,
         atrWeight: this.parameters.atrWeight || 0.10,
         minimumBullishScore: this.parameters.minimumBullishScore || 0.5,
         minimumBearishScore: this.parameters.minimumBearishScore || 0.5,
@@ -525,7 +525,7 @@ export class DashboardAlpacaTradingEngine {
         console.log(`🏛️ PAPER TRADING - INSTITUTIONAL SIGNAL: ${signal.action}`);
         console.log(`📊 Confidence: ${(signal.confidence * 100).toFixed(1)}% (SAME AS BACKTEST)`);
         console.log(`🔍 Reasoning: ${signal.reasoning}`);
-        console.log(`🎯 Using: GEX(${institutionalConfig.gexWeight}), AVP(${institutionalConfig.avpWeight}), AVWAP(${institutionalConfig.avwapWeight}), Fractals(${institutionalConfig.fractalWeight}), ATR(${institutionalConfig.atrWeight})`);
+        console.log(`🎯 Using: GEX(0.0-DISABLED), AVP(${institutionalConfig.avpWeight}), AVWAP(${institutionalConfig.avwapWeight}), Fractals(${institutionalConfig.fractalWeight}), ATR(${institutionalConfig.atrWeight})`);
         
         // Map our DirectInstitutional signals to dashboard format
         let dashboardAction: 'BUY_CALL' | 'BUY_PUT' | 'NO_TRADE';
@@ -1031,10 +1031,25 @@ export class DashboardAlpacaTradingEngine {
     const winRate = this.completedTrades.length > 0 ? winningTrades / this.completedTrades.length : 0;
     
     console.log(`📊 INSTITUTIONAL PAPER TRADING STATUS:`);
+    this.debugPositionTracking();
     console.log(`   💰 P&L: $${totalPnL.toFixed(2)} (Target: $${this.parameters.dailyPnLTarget})`);
     console.log(`   📈 Active Positions: ${this.activeTrades.length}/${this.parameters.maxConcurrentPositions}`);
     console.log(`   🎯 Win Rate: ${(winRate * 100).toFixed(1)}% (Backtest: 50.9%)`);
-    console.log(`   🏛️ Features: GEX(${this.parameters.gexWeight || 0.30}), AVP(${this.parameters.avpWeight || 0.20}), AVWAP(${this.parameters.avwapWeight || 0.20}), Fractals(${this.parameters.fractalWeight || 0.20})`);
+    console.log(`   🏛️ Features: GEX(0.0-DISABLED), AVP(${this.parameters.avpWeight || 0.25}), AVWAP(${this.parameters.avwapWeight || 0.40}), Fractals(${this.parameters.fractalWeight || 0.25})`);
+  }
+
+
+  /**
+   * Debug position tracking issues
+   */
+  private debugPositionTracking(): void {
+    console.log(`🔍 POSITION TRACKING DEBUG:`);
+    console.log(`   Internal activeTrades: ${this.activeTrades.length}`);
+    console.log(`   Max allowed: ${this.parameters.maxConcurrentPositions}`);
+    
+    this.activeTrades.forEach((trade, index) => {
+      console.log(`   Trade ${index + 1}: ${trade.symbol} | Status: ${trade.status} | ID: ${trade.clientOrderId}`);
+    });
   }
 
   async getDashboardStats(): Promise<any> {

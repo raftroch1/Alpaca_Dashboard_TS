@@ -20,6 +20,11 @@ class TradingDashboard {
         // 💾 Load saved parameters or use balanced preset
         this.loadSavedParametersOrDefault();
         this.initializeAdvancedControls(); // Initialize advanced controls with defaults
+        
+        // Hide GEX Controls since GEX is disabled by default
+        setTimeout(() => {
+            this.toggleGEXControls(0);
+        }, 100);
     }
 
     getDefaultConfig() {
@@ -311,7 +316,13 @@ class TradingDashboard {
                 partialProfitLevel: 30,
                 partialProfitSize: 50,
                 moveStopToBreakeven: false,
-                reducedSignalSpacing: false
+                reducedSignalSpacing: false,
+                // Institutional weights (GEX disabled)
+                gexWeight: 0.0,
+                avpWeight: 0.25,
+                avwapWeight: 0.40,
+                fractalWeight: 0.25,
+                atrWeight: 0.10
             },
             sensitive: {
                 dailyPnLTarget: 150,
@@ -429,15 +440,44 @@ class TradingDashboard {
         // Update current config and save to localStorage
         this.currentConfig[input.id] = parseFloat(input.value);
         this.saveParametersToStorage();
+        
+        // Hide/show GEX Controls based on GEX Weight
+        if (input.id === 'gexWeight') {
+            this.toggleGEXControls(parseFloat(input.value));
+        }
+    }
+    
+    toggleGEXControls(gexWeight) {
+        // Find all elements that contain "GEX Controls" text
+        const allH4s = document.querySelectorAll('h4');
+        let gexControlsPanel = null;
+        
+        allH4s.forEach(h4 => {
+            if (h4.textContent.includes('GEX Controls')) {
+                gexControlsPanel = h4.parentElement;
+            }
+        });
+        
+        if (gexControlsPanel) {
+            if (gexWeight === 0) {
+                gexControlsPanel.style.display = 'none';
+                console.log('🚫 GEX Controls hidden - GEX Weight is 0');
+                this.addLog('GEX Controls hidden (weight = 0)', 'info');
+            } else {
+                gexControlsPanel.style.display = 'block';
+                console.log('✅ GEX Controls shown - GEX Weight > 0');
+                this.addLog('GEX Controls shown (weight > 0)', 'info');
+            }
+        }
     }
 
     getAdvancedDefaults() {
         return {
-            // Component Weights
-            gexWeight: 0.30,
-            avpWeight: 0.20,
-            avwapWeight: 0.20,
-            fractalWeight: 0.20,
+            // Component Weights (GEX DISABLED)
+            gexWeight: 0.0,   // DISABLED - was causing bullish bias
+            avpWeight: 0.25,  // Increased
+            avwapWeight: 0.40, // MAJOR WEIGHT - trend following
+            fractalWeight: 0.25, // Increased
             atrWeight: 0.10,
             
             // Signal Thresholds
@@ -821,17 +861,13 @@ class TradingDashboard {
     
     loadSavedParametersOrDefault() {
         try {
-            const savedParams = localStorage.getItem('dashboardTradingParameters');
+            // FORCE CLEAR old parameters to apply GEX fix
+            localStorage.removeItem('dashboardTradingParameters');
+            console.log('🔄 Cleared old parameters to apply GEX fix');
             
-            if (savedParams) {
-                const config = JSON.parse(savedParams);
-                console.log('💾 Loading saved parameters from localStorage');
-                this.applySavedParameters(config);
-                this.addLog('Loaded previous session parameters', 'success');
-            } else {
-                console.log('💾 No saved parameters found, using balanced preset');
-                this.loadPreset('balanced'); // Start with balanced preset
-            }
+            console.log('💾 Loading balanced preset with GEX disabled');
+            this.loadPreset('balanced'); // Use balanced preset with GEX disabled
+            
         } catch (error) {
             console.error('❌ Failed to load saved parameters:', error);
             this.loadPreset('balanced'); // Fallback to balanced preset

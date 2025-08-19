@@ -192,11 +192,11 @@ export class ParameterPresets {
       portfolioRiskLimit: 10.0, // Standard risk
       dailyLossLimit: 500,
       
-      // DirectIntegrationConfig parameters (SAME AS WORKING BACKTEST)
-      gexWeight: 0.30,
-      avpWeight: 0.20,
-      avwapWeight: 0.20,
-      fractalWeight: 0.20,
+      // DirectIntegrationConfig parameters (GEX DISABLED FOR TREND FOLLOWING)
+      gexWeight: 0.0,   // DISABLED - was causing bullish bias
+      avpWeight: 0.25,  // Increased
+      avwapWeight: 0.40, // MAJOR WEIGHT - trend following  
+      fractalWeight: 0.25, // Increased
       atrWeight: 0.10,
       minimumBullishScore: 0.5,  // Relaxed from 0.7 (same as backtest)
       minimumBearishScore: 0.5,

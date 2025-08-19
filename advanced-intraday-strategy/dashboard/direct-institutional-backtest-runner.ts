@@ -44,7 +44,7 @@ export class DirectInstitutionalBacktestRunner {
     
     console.log('🏛️ DIRECT INSTITUTIONAL BACKTEST');
     console.log('==============================');
-    console.log(`📅 Period: Last ${daysBack} days`);
+    console.log(`📅 Period: Random ${daysBack} days (for diverse testing)`);
     console.log(`⏱️ Timeframe: ${timeframe}`);
     console.log(`🎯 Daily Target: $${parameters.dailyPnLTarget}`);
     console.log(`🛡️ Stop Loss: ${(parameters.initialStopLossPct * 100).toFixed(0)}%`);
@@ -56,10 +56,10 @@ export class DirectInstitutionalBacktestRunner {
       // Use REAL Alpaca historical data instead of mock data
       const { alpacaHTTPClient } = await import('../../lib/alpaca-http-client');
       
-      // Calculate date range for real data
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - daysBack);
+      // 🎲 RANDOM DATE SELECTION for diverse testing
+      const { startDate, endDate } = this.selectRandomBacktestPeriod(daysBack);
+      
+      console.log(`🎲 Random period selected: ${startDate.toDateString()} to ${endDate.toDateString()}`);
       
       console.log(`📊 Fetching REAL Alpaca data from ${startDate.toDateString()} to ${endDate.toDateString()}`);
       
@@ -112,12 +112,12 @@ export class DirectInstitutionalBacktestRunner {
         const currentData = marketData.slice(0, i + 1);
         
         try {
-          // Use our proven DirectInstitutionalIntegration with relaxed config for real data
+          // Use SAME config as paper trading - GEX DISABLED for trend following
           const relaxedDirectConfig = {
-            gexWeight: 0.30,
-            avpWeight: 0.20,
-            avwapWeight: 0.20,
-            fractalWeight: 0.20,
+            gexWeight: 0.0,   // FORCE DISABLED - was causing bullish bias
+            avpWeight: 0.25,  // Increased
+            avwapWeight: 0.40, // MAJOR WEIGHT - trend following
+            fractalWeight: 0.25, // Increased
             atrWeight: 0.10,
             minimumBullishScore: 0.5,  // Relaxed from 0.7
             minimumBearishScore: 0.5,
@@ -445,6 +445,34 @@ export class DirectInstitutionalBacktestRunner {
     return options;
   }
 
+
+  /**
+   * Select random backtest period for diverse testing
+   */
+  private static selectRandomBacktestPeriod(daysBack: number): { startDate: Date, endDate: Date } {
+    // Define available date range (last 6 months for variety)
+    const maxDaysBack = 180; // 6 months of history
+    const minDaysBack = daysBack + 7; // Ensure we have enough data
+    
+    // Generate random start point
+    const randomDaysBack = Math.floor(Math.random() * (maxDaysBack - minDaysBack)) + minDaysBack;
+    
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() - randomDaysBack);
+    
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate() - daysBack);
+    
+    // Ensure we don't select weekends (adjust to weekdays)
+    while (startDate.getDay() === 0 || startDate.getDay() === 6) {
+      startDate.setDate(startDate.getDate() + 1);
+    }
+    while (endDate.getDay() === 0 || endDate.getDay() === 6) {
+      endDate.setDate(endDate.getDate() - 1);
+    }
+    
+    return { startDate, endDate };
+  }
 
   /**
    * Generate realistic options chain based on Theta Data patterns

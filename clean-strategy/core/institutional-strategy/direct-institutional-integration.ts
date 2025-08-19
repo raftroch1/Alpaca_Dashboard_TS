@@ -73,10 +73,10 @@ export interface DirectSignal {
 export class DirectInstitutionalIntegration {
   
   private static readonly DEFAULT_CONFIG: DirectIntegrationConfig = {
-    gexWeight: 0.30,
-    avpWeight: 0.20,
-    avwapWeight: 0.20,
-    fractalWeight: 0.20,
+    gexWeight: 0.0,   // DISABLED - was causing bullish bias
+    avpWeight: 0.25,  // Increased weight
+    avwapWeight: 0.40, // MAJOR WEIGHT - trend following
+    fractalWeight: 0.25, // Increased weight
     atrWeight: 0.10,
     
     minimumBullishScore: 0.35, // Lowered from 0.6 to allow more trades
@@ -100,6 +100,14 @@ export class DirectInstitutionalIntegration {
   ): Promise<DirectSignal> {
     
     const fullConfig = { ...this.DEFAULT_CONFIG, ...config };
+    
+    // FORCE GEX DISABLED to fix bullish bias (override any dashboard settings)
+    fullConfig.gexWeight = 0.0;
+    fullConfig.avwapWeight = 0.40; // Increase AVWAP for trend following
+    fullConfig.avpWeight = 0.25;   // Increase AVP
+    fullConfig.fractalWeight = 0.25; // Increase fractals
+    
+    console.log(`🚫 GEX FORCE DISABLED - Using trend-following weights: AVWAP(0.40), AVP(0.25), Fractals(0.25)`);
     const currentPrice = marketData[marketData.length - 1].close;
     
     console.log(`🎯 DIRECT INSTITUTIONAL INTEGRATION`);
@@ -120,14 +128,22 @@ export class DirectInstitutionalIntegration {
     let fractalAnalysis: MicrofractalSnapshot | undefined;
     let atrAnalysis: ATRSnapshot | undefined;
     
-    // 1. GEX Analysis (always works)
+    // 1. GEX Analysis (DISABLED - was causing bullish bias)
     try {
       gexAnalysis = GammaExposureEngine.calculateGEX(optionsChain, currentPrice);
-      gexScore = this.scoreGEX(gexAnalysis);
-      console.log(`   📊 GEX Score: ${gexScore.toFixed(2)} (${gexAnalysis.volatilityRegime}, ${gexAnalysis.gammaRisk})`);
+      
+      // FORCE GEX DISABLED regardless of config
+      if (fullConfig.gexWeight === 0) {
+        gexScore = 0;
+        console.log(`   📊 GEX Score: 0.00 (DISABLED - was causing bullish bias)`);
+      } else {
+        gexScore = this.scoreGEX(gexAnalysis, currentPrice);
+        console.log(`   📊 GEX Score: ${gexScore.toFixed(2)} (${gexAnalysis.volatilityRegime}, ${gexAnalysis.gammaRisk})`);
+      }
     } catch (error: any) {
       console.log(`   ❌ GEX Analysis failed: ${error.message}`);
       gexAnalysis = {} as GEXSnapshot;
+      gexScore = 0;
     }
     
     // 2. AVP Analysis (if enough data)
@@ -182,17 +198,19 @@ export class DirectInstitutionalIntegration {
       console.log(`   ❌ ATR Analysis failed: ${error.message}`);
     }
     
-    // Calculate weighted total score
+    // Calculate weighted total score (FORCE GEX TO 0)
     const totalScore = (
-      gexScore * fullConfig.gexWeight +
+      0 * fullConfig.gexWeight +  // FORCE GEX TO 0 regardless of weight
       avpScore * fullConfig.avpWeight +
       avwapScore * fullConfig.avwapWeight +
       fractalScore * fullConfig.fractalWeight +
       atrScore * fullConfig.atrWeight
     );
     
+    console.log(`🚫 FORCED GEX TO 0 - Calculation: AVP(${avpScore.toFixed(2)}×${fullConfig.avpWeight}) + AVWAP(${avwapScore.toFixed(2)}×${fullConfig.avwapWeight}) + Fractals(${fractalScore.toFixed(2)}×${fullConfig.fractalWeight}) + ATR(${atrScore.toFixed(2)}×${fullConfig.atrWeight}) = ${totalScore.toFixed(2)}`);
+    
     console.log(`\n📊 SCORING RESULTS:`);
-    console.log(`   GEX: ${gexScore.toFixed(2)} (weight: ${fullConfig.gexWeight})`);
+    console.log(`   GEX: 0.00 (DISABLED - was causing bullish bias)`);
     console.log(`   AVP: ${avpScore.toFixed(2)} (weight: ${fullConfig.avpWeight})`);
     console.log(`   AVWAP: ${avwapScore.toFixed(2)} (weight: ${fullConfig.avwapWeight})`);
     console.log(`   Fractals: ${fractalScore.toFixed(2)} (weight: ${fullConfig.fractalWeight})`);
@@ -270,30 +288,56 @@ export class DirectInstitutionalIntegration {
     };
   }
   
-  private static scoreGEX(gex: GEXSnapshot): number {
+  private static scoreGEX(gex: GEXSnapshot, currentPrice: number): number {
     if (!gex.volatilityRegime) return 0;
     
+    // FIXED: Make GEX scoring truly directional based on flip point
     let score = 0;
     
-    // Volatility regime scoring
-    switch (gex.volatilityRegime) {
-      case 'AMPLIFYING':
-        score += 0.8; // High opportunity
-        break;
-      case 'TRANSITIONAL':
-        score += 0.6;
-        break;
-      case 'SUPPRESSING':
-        score += 0.4;
-        break;
+    // Determine directional bias based on flip point (CORE FIX)
+    const isAboveFlip = gex.gammaFlipPoint ? currentPrice > gex.gammaFlipPoint : true;
+    
+    console.log(`   🎯 GEX Directional: Price $${currentPrice.toFixed(2)} ${isAboveFlip ? 'ABOVE' : 'BELOW'} flip $${gex.gammaFlipPoint?.toFixed(2) || 'N/A'}`);
+    
+    // Base directional score from positioning and flip point
+    if (isAboveFlip) {
+      // Above flip point = bullish bias
+      switch (gex.volatilityRegime) {
+        case 'SUPPRESSING':
+          score = 0.8; // Strong bullish when suppressing above flip
+          break;
+        case 'AMPLIFYING':
+          score = 0.6; // Moderate bullish when amplifying above flip
+          break;
+        case 'TRANSITIONAL':
+          score = 0.4; // Weak bullish when transitional above flip
+          break;
+      }
+    } else {
+      // Below flip point = bearish bias (CRITICAL FIX)
+      switch (gex.volatilityRegime) {
+        case 'SUPPRESSING':
+          score = -0.8; // Strong BEARISH when suppressing below flip
+          break;
+        case 'AMPLIFYING':
+          score = -0.6; // Moderate BEARISH when amplifying below flip
+          break;
+        case 'TRANSITIONAL':
+          score = -0.4; // Weak BEARISH when transitional below flip
+          break;
+      }
     }
     
-    // Gamma risk as opportunity
+    // Extreme gamma modifier (increases magnitude)
     if (gex.gammaRisk === 'EXTREME') {
-      score += 0.4; // Extreme gamma = more opportunity
+      score = score * 1.2; // Amplify the directional signal
     }
     
-    return score;
+    const finalScore = Math.max(-1.0, Math.min(1.0, score));
+    
+    console.log(`   📊 GEX Final: ${finalScore > 0 ? 'BULLISH' : 'BEARISH'} ${finalScore.toFixed(2)}`);
+    
+    return finalScore;
   }
   
   private static scoreAVP(avp: AVPSnapshot, currentPrice: number): number {
