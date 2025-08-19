@@ -353,6 +353,90 @@ export class DashboardAlpacaTradingEngine {
     }, 10000); // Every 10 seconds
   }
 
+
+  /**
+   * Generate realistic options chain (SAME AS BACKTEST for consistency)
+   */
+  private generateRealisticOptionsChain(currentPrice: number, date: Date): any[] {
+    const options = [];
+    const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
+    
+    console.log(`📊 PAPER TRADING: Using same realistic options as backtest for SPY at $${currentPrice.toFixed(2)}`);
+    
+    // Generate realistic 0-DTE options around current price (±$10 range)
+    for (let i = -10; i <= 10; i++) {
+      const strike = Math.round(currentPrice) + i;
+      const moneyness = (currentPrice - strike) / currentPrice;
+      
+      // CALL options with realistic institutional Greeks
+      const callDelta = Math.max(0.01, Math.min(0.99, 
+        strike <= currentPrice ? 0.85 - Math.abs(moneyness) * 5 : // ITM
+        0.50 * Math.exp(-Math.abs(moneyness) * 20) // OTM
+      ));
+      
+      // Realistic 0-DTE pricing based on moneyness (SAME AS BACKTEST)
+      let callPrice;
+      if (Math.abs(moneyness) < 0.003) {
+        callPrice = 2.00 + Math.random() * 1.00; // ATM: $2.00-3.00
+      } else if (Math.abs(moneyness) < 0.008) {
+        callPrice = 1.25 + Math.random() * 0.75; // Near ATM: $1.25-2.00
+      } else if (Math.abs(moneyness) < 0.015) {
+        callPrice = 0.50 + Math.random() * 0.50; // OTM: $0.50-1.00
+      } else {
+        callPrice = 0.05 + Math.random() * 0.25; // Far OTM: $0.05-0.30
+      }
+      
+      options.push({
+        symbol: `SPY${dateStr.slice(2)}C${String(strike * 1000).padStart(8, '0')}`,
+        strike: strike,
+        side: 'CALL',
+        bid: callPrice * 0.95,
+        ask: callPrice * 1.05,
+        delta: callDelta,
+        last: callPrice,
+        volume: Math.floor(Math.random() * 500) + 10,
+        openInterest: Math.floor(Math.random() * 2000) + 100,
+        impliedVolatility: 0.15 + Math.random() * 0.30,
+        expiration: new Date()
+      });
+      
+      // PUT options with realistic institutional Greeks
+      const putDelta = Math.max(-0.99, Math.min(-0.01,
+        strike >= currentPrice ? -0.85 + Math.abs(moneyness) * 5 : // ITM
+        -0.50 * Math.exp(-Math.abs(moneyness) * 20) // OTM
+      ));
+      
+      // Realistic PUT pricing (SAME AS BACKTEST)
+      let putPrice;
+      if (Math.abs(moneyness) < 0.003) {
+        putPrice = 2.00 + Math.random() * 1.00; // ATM
+      } else if (Math.abs(moneyness) < 0.008) {
+        putPrice = 1.25 + Math.random() * 0.75; // Near ATM
+      } else if (Math.abs(moneyness) < 0.015) {
+        putPrice = 0.50 + Math.random() * 0.50; // OTM
+      } else {
+        putPrice = 0.05 + Math.random() * 0.25; // Far OTM
+      }
+      
+      options.push({
+        symbol: `SPY${dateStr.slice(2)}P${String(strike * 1000).padStart(8, '0')}`,
+        strike: strike,
+        side: 'PUT',
+        bid: putPrice * 0.95,
+        ask: putPrice * 1.05,
+        delta: putDelta,
+        last: putPrice,
+        volume: Math.floor(Math.random() * 500) + 10,
+        openInterest: Math.floor(Math.random() * 2000) + 100,
+        impliedVolatility: 0.15 + Math.random() * 0.30,
+        expiration: new Date()
+      });
+    }
+    
+    console.log(`✅ PAPER TRADING: Generated ${options.length} realistic options (SAME LOGIC AS BACKTEST)`);
+    return options;
+  }
+
   private async getCurrentMarketData(): Promise<MarketData[]> {
     try {
       const endTime = new Date();
@@ -410,8 +494,8 @@ export class DashboardAlpacaTradingEngine {
     }
     
     try {
-      // Get options chain
-      const optionsChain = await alpacaHTTPClient.getOptionsChain('SPY');
+      // Use SAME realistic options generator as backtest
+      const optionsChain = this.generateRealisticOptionsChain(currentBar.close, currentBar.date);
       
       // 🚀 USE EXACT SAME METHOD AS BACKTEST - DirectInstitutionalIntegration
       const { DirectInstitutionalIntegration } = await import('../../clean-strategy/core/institutional-strategy/direct-institutional-integration');

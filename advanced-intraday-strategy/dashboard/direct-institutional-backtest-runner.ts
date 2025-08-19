@@ -422,7 +422,7 @@ export class DirectInstitutionalBacktestRunner {
         bid: callPrice * 0.95,
         ask: callPrice * 1.05,
         delta: callDelta,
-        expiration: dateStr
+        expiration: new Date()
       });
       
       // PUT options  
@@ -437,7 +437,7 @@ export class DirectInstitutionalBacktestRunner {
         bid: putPrice * 0.95,
         ask: putPrice * 1.05,
         delta: putDelta,
-        expiration: dateStr
+        expiration: new Date()
       });
     }
     
@@ -489,7 +489,7 @@ export class DirectInstitutionalBacktestRunner {
         volume: Math.floor(Math.random() * 500) + 10,
         openInterest: Math.floor(Math.random() * 2000) + 100,
         impliedVolatility: 0.15 + Math.random() * 0.30,
-        expiration: dateStr
+        expiration: new Date()
       });
       
       // PUT options with realistic institutional Greeks
@@ -521,7 +521,7 @@ export class DirectInstitutionalBacktestRunner {
         volume: Math.floor(Math.random() * 500) + 10,
         openInterest: Math.floor(Math.random() * 2000) + 100,
         impliedVolatility: 0.15 + Math.random() * 0.30,
-        expiration: dateStr
+        expiration: new Date()
       });
     }
     
