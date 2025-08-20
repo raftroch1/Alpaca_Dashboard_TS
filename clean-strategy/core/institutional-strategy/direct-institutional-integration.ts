@@ -223,47 +223,80 @@ export class DirectInstitutionalIntegration {
     let action: DirectSignal['action'] = 'NO_TRADE';
     let reasoning = 'Insufficient confluence for trade';
     
-    // Only trade if we have reasonable confidence in bias detection AND institutional confluence
-    if (marketBias.confidence >= 50) {
-      
-      // Use institutional scoring for trade quality (strength)
-      const institutionalStrength = Math.abs(totalScore);
-      const biasStrength = marketBias.strength;
-      
-      // Combined strength: institutional confluence + market bias confidence
+    // 🎯 TIERED CONFIDENCE SYSTEM - Works in ANY market condition
+    const institutionalStrength = Math.abs(totalScore);
+    const biasStrength = marketBias.strength;
+    
+    console.log(`🎯 TIERED ANALYSIS: Bias(${marketBias.confidence}%) + Institutional(${institutionalStrength.toFixed(2)})`);
+    
+    if (marketBias.confidence >= 70) {
+      // TIER 1: Strong bias confidence - use bias direction
       const combinedStrength = (institutionalStrength + biasStrength) / 2;
-      
-      if (combinedStrength >= 0.3) { // Minimum combined strength
-        
+      if (combinedStrength >= 0.3) {
         switch (marketBias.bias) {
           case 'BULLISH':
             action = 'BUY_CALL';
-            finalScore = combinedStrength; // Keep positive
-            reasoning = `BULLISH bias (${marketBias.confidence}%) + institutional confluence (${institutionalStrength.toFixed(2)})`;
-            console.log(`🟢 BIAS-DRIVEN: BULLISH INTERNALS → BUY_CALL`);
+            finalScore = combinedStrength;
+            reasoning = `STRONG bias (${marketBias.confidence}%) + institutional confluence`;
+            console.log(`🟢 TIER 1 - STRONG BIAS: BULLISH → BUY_CALL`);
             break;
-            
           case 'BEARISH':
             action = 'BUY_PUT';
-            finalScore = -combinedStrength; // Make negative
-            reasoning = `BEARISH bias (${marketBias.confidence}%) + institutional confluence (${institutionalStrength.toFixed(2)})`;
-            console.log(`🔴 BIAS-DRIVEN: BEARISH INTERNALS → BUY_PUT`);
-            break;
-            
-          case 'NEUTRAL':
-            action = 'NO_TRADE';
-            finalScore = 0;
-            reasoning = `NEUTRAL bias - mixed market internals`;
-            console.log(`⚪ BIAS-DRIVEN: NEUTRAL INTERNALS → NO_TRADE`);
+            finalScore = -combinedStrength;
+            reasoning = `STRONG bias (${marketBias.confidence}%) + institutional confluence`;
+            console.log(`🔴 TIER 1 - STRONG BIAS: BEARISH → BUY_PUT`);
             break;
         }
-      } else {
-        reasoning = `${marketBias.bias} bias but insufficient combined strength (${combinedStrength.toFixed(2)} < 0.3)`;
-        console.log(`⚠️ BIAS-DRIVEN: ${marketBias.bias} but weak combined signal`);
       }
-    } else {
-      reasoning = `Low bias confidence (${marketBias.confidence}%) - mixed market internals`;
-      console.log(`⚠️ BIAS-DRIVEN: Low confidence ${marketBias.confidence}%`);
+    } else if (marketBias.confidence >= 40 && institutionalStrength >= 0.2) {
+      // TIER 2: Moderate bias + good institutional - RESPECT AVWAP DIRECTION
+      
+      // 🚨 CRITICAL FIX: Check AVWAP direction first when it's strongly bearish/bullish
+      const avwapDeviation = avwapAnalysis ? ((currentPrice - (avwapAnalysis as any).currentAVWAP) / (avwapAnalysis as any).currentAVWAP) * 100 : 0;
+      
+      if (avwapScore <= -0.5 && avwapDeviation < -0.3) {
+        // Strong bearish AVWAP overrides positive institutional scores
+        action = 'BUY_PUT';
+        finalScore = Math.abs(avwapScore);
+        reasoning = `Strong AVWAP bearish signal overrides institutional confluence (AVWAP: ${avwapDeviation.toFixed(2)}%)`;
+        console.log(`🔴 TIER 2 - AVWAP OVERRIDE: Strong bearish AVWAP → BUY_PUT`);
+      } else if (avwapScore >= 0.5 && avwapDeviation > 0.3) {
+        // Strong bullish AVWAP overrides negative institutional scores
+        action = 'BUY_CALL';
+        finalScore = avwapScore;
+        reasoning = `Strong AVWAP bullish signal overrides institutional confluence (AVWAP: +${avwapDeviation.toFixed(2)}%)`;
+        console.log(`🟢 TIER 2 - AVWAP OVERRIDE: Strong bullish AVWAP → BUY_CALL`);
+      } else if (totalScore > 0.2) {
+        action = 'BUY_CALL';
+        finalScore = institutionalStrength;
+        reasoning = `Moderate bias + BULLISH institutional confluence (${totalScore.toFixed(2)})`;
+        console.log(`🟢 TIER 2 - INSTITUTIONAL: BULLISH confluence → BUY_CALL`);
+      } else if (totalScore < -0.2) {
+        action = 'BUY_PUT';
+        finalScore = -institutionalStrength;
+        reasoning = `Moderate bias + BEARISH institutional confluence (${totalScore.toFixed(2)})`;
+        console.log(`🔴 TIER 2 - INSTITUTIONAL: BEARISH confluence → BUY_PUT`);
+      }
+    } else if (institutionalStrength >= 0.15) {
+      // TIER 3: Weak bias but decent institutional - use AVWAP position
+      const avwapDeviation = avwapAnalysis ? ((currentPrice - (avwapAnalysis as any).currentAVWAP) / (avwapAnalysis as any).currentAVWAP) * 100 : 0;
+      
+      if (avwapDeviation > 0.2) {
+        action = 'BUY_CALL';
+        finalScore = 0.4;
+        reasoning = `AVWAP position: +${avwapDeviation.toFixed(2)}% above AVWAP`;
+        console.log(`🟢 TIER 3 - AVWAP: Above AVWAP → BUY_CALL`);
+      } else if (avwapDeviation < -0.2) {
+        action = 'BUY_PUT';
+        finalScore = -0.4;
+        reasoning = `AVWAP position: ${avwapDeviation.toFixed(2)}% below AVWAP`;
+        console.log(`🔴 TIER 3 - AVWAP: Below AVWAP → BUY_PUT`);
+      }
+    }
+    
+    if (action === 'NO_TRADE') {
+      reasoning = `No clear directional signal: Bias(${marketBias.confidence}%), Institutional(${institutionalStrength.toFixed(2)})`;
+      console.log(`⚪ NO SIGNAL: Insufficient conviction across all tiers`);
     }
     
     console.log(`\n📊 SCORING RESULTS:`);
@@ -427,23 +460,31 @@ export class DirectInstitutionalIntegration {
   }
   
   private static scoreAVWAP(avwap: AVWAPSnapshot, currentPrice: number): number {
-    if (!avwap.trendDirection) return 0;
+    if (!avwap.currentAVWAP) return 0;
+    
+    // 🎯 ENHANCED 0-DTE AVWAP SCORING - Prioritize POSITION over SLOPE
+    const avwapPrice = avwap.currentAVWAP;
+    const deviation = ((currentPrice - avwapPrice) / avwapPrice) * 100; // Percentage deviation
+    
+    console.log(`   📊 AVWAP POSITION: Price $${currentPrice.toFixed(2)} vs AVWAP $${avwapPrice.toFixed(2)} = ${deviation > 0 ? '+' : ''}${deviation.toFixed(2)}%`);
     
     let score = 0;
     
-    // More sensitive trend direction scoring
-    const trendStr = avwap.trendDirection.toString();
-    if (trendStr.includes('BULLISH')) {
-      score = 0.6;
-    } else if (trendStr.includes('BEARISH')) {
-      score = -0.6;
-    } else if (trendStr.includes('NEUTRAL')) {
-      // Give some credit for neutral positioning near VWAP
-      if (trendStr.includes('WEAK')) {
-        score = 0.2; // Small positive score for weak neutral (potential breakout)
-      } else {
-        score = 0.1; // Minimal score for pure neutral
-      }
+    // Position-based scoring for 0-DTE (more important than slope for intraday)
+    if (deviation > 0.3) {
+      score = 0.6; // Strong BULLISH - price well above AVWAP
+      console.log(`   🜵 AVWAP BULLISH: +${deviation.toFixed(2)}% above AVWAP`);
+    } else if (deviation < -0.3) {
+      score = -0.6; // Strong BEARISH - price well below AVWAP  
+      console.log(`   🔴 AVWAP BEARISH: ${deviation.toFixed(2)}% below AVWAP`);
+    } else if (Math.abs(deviation) > 0.1) {
+      // Moderate deviation
+      score = deviation > 0 ? 0.3 : -0.3;
+      console.log(`   🟡 AVWAP MODERATE: ${deviation > 0 ? 'Above' : 'Below'} AVWAP by ${Math.abs(deviation).toFixed(2)}%`);
+    } else {
+      // Very close to AVWAP
+      score = 0.1; // Slight positive for being near institutional level
+      console.log(`   ⚪ AVWAP NEUTRAL: Near AVWAP (${deviation.toFixed(2)}%)`);
     }
     
     return score;
