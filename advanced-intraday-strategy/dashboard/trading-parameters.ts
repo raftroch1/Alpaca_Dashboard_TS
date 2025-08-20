@@ -134,7 +134,18 @@ export class ParameterPresets {
       minConfidenceLevel: 0.7, // Higher confidence for conservative
       enableGreeksMonitoring: true,
       portfolioRiskLimit: 5.0, // Lower risk for conservative
-      dailyLossLimit: 300
+      dailyLossLimit: 300,
+      
+      // 🛡️ CONSERVATIVE WEIGHTS (Total = 1.0) - Stability-focused
+      gexWeight: 0.0,      // DISABLED
+      avpWeight: 0.40,     // HIGH - Support/resistance focus
+      avwapWeight: 0.35,   // HIGH - Trend confirmation
+      fractalWeight: 0.15, // LOW - Less aggressive entries
+      atrWeight: 0.10,     // STANDARD - Risk management
+      minimumBullishScore: 0.6,  // Higher threshold for conservative
+      minimumBearishScore: 0.6,
+      riskMultiplier: 0.8,
+      maxPositionSize: 0.015
     }
   };
 
@@ -257,7 +268,18 @@ export class ParameterPresets {
       minConfidenceLevel: 0.35, // Much lower confidence threshold
       enableGreeksMonitoring: true,
       portfolioRiskLimit: 8.0,
-      dailyLossLimit: 400
+      dailyLossLimit: 400,
+      
+      // ⚡ SENSITIVE WEIGHTS (Total = 1.0) - Signal-focused
+      gexWeight: 0.0,      // DISABLED
+      avpWeight: 0.20,     // LOWER - Less filtering
+      avwapWeight: 0.30,   // MEDIUM - Trend detection
+      fractalWeight: 0.35, // HIGH - More precise entries
+      atrWeight: 0.15,     // HIGHER - More volatility awareness
+      minimumBullishScore: 0.4,  // Lower for more signals
+      minimumBearishScore: 0.4,
+      riskMultiplier: 1.1,
+      maxPositionSize: 0.025
     }
   };
 
@@ -313,7 +335,18 @@ export class ParameterPresets {
       minConfidenceLevel: 0.5, // Lower confidence for more trades
       enableGreeksMonitoring: true,
       portfolioRiskLimit: 15.0, // Higher risk for aggressive
-      dailyLossLimit: 750
+      dailyLossLimit: 750,
+      
+      // 🚀 AGGRESSIVE WEIGHTS (Total = 1.0) - Opportunity-focused
+      gexWeight: 0.0,      // DISABLED
+      avpWeight: 0.15,     // LOW - Less conservative filtering
+      avwapWeight: 0.45,   // HIGHEST - Strong trend following
+      fractalWeight: 0.30, // HIGH - Aggressive entries
+      atrWeight: 0.10,     // STANDARD - Risk management
+      minimumBullishScore: 0.45,  // Lower for more opportunities
+      minimumBearishScore: 0.45,
+      riskMultiplier: 1.2,
+      maxPositionSize: 0.03
     }
   };
 

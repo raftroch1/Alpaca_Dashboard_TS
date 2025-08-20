@@ -17,7 +17,7 @@ class DashboardLauncher {
   private server?: DashboardServer;
   private port: number;
 
-  constructor(port: number = 8080) {
+  constructor(port: number = 8081) {
     this.port = port;
   }
 
@@ -70,7 +70,8 @@ class DashboardLauncher {
 
   private async openDashboard(): Promise<void> {
     const dashboardPath = path.resolve(__dirname, 'index.html');
-    const dashboardUrl = `file://${dashboardPath}`;
+    const cacheBuster = Date.now();
+    const dashboardUrl = `file://${dashboardPath}?v=${cacheBuster}`;
     
     console.log('🌐 Opening dashboard in browser...');
     console.log(`📱 Dashboard URL: ${dashboardUrl}`);

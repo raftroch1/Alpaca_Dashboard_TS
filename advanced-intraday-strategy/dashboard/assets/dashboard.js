@@ -20,6 +20,7 @@ class TradingDashboard {
         // 💾 Load saved parameters or use balanced preset
         this.loadSavedParametersOrDefault();
         this.initializeAdvancedControls(); // Initialize advanced controls with defaults
+        this.initializePresetButtons(); // 🔧 CRITICAL FIX: Add preset button handlers
         
         // Hide GEX Controls since GEX is disabled by default
         setTimeout(() => {
@@ -288,7 +289,13 @@ class TradingDashboard {
                 usePartialProfitTaking: true,
                 partialProfitLevel: 25,
                 moveStopToBreakeven: true,
-                reducedSignalSpacing: false
+                reducedSignalSpacing: false,
+                // 🛡️ CONSERVATIVE WEIGHTS (Total = 1.0) - Stability-focused
+                gexWeight: 0.0,      // DISABLED
+                avpWeight: 0.40,     // HIGH - Support/resistance focus
+                avwapWeight: 0.35,   // HIGH - Trend confirmation
+                fractalWeight: 0.15, // LOW - Less aggressive entries
+                atrWeight: 0.10      // STANDARD - Risk management
             },
             balanced: {
                 dailyPnLTarget: 200,
@@ -350,7 +357,13 @@ class TradingDashboard {
                 partialProfitLevel: 25,
                 partialProfitSize: 50,
                 moveStopToBreakeven: false,
-                reducedSignalSpacing: false
+                reducedSignalSpacing: false,
+                // ⚡ SENSITIVE WEIGHTS (Total = 1.0) - Signal-focused
+                gexWeight: 0.0,      // DISABLED
+                avpWeight: 0.20,     // LOWER - Less filtering
+                avwapWeight: 0.30,   // MEDIUM - Trend detection
+                fractalWeight: 0.35, // HIGH - More precise entries
+                atrWeight: 0.15      // HIGHER - More volatility awareness
             },
             aggressive: {
                 dailyPnLTarget: 400,
@@ -378,7 +391,13 @@ class TradingDashboard {
                 partialProfitLevel: 35,
                 partialProfitSize: 40,
                 moveStopToBreakeven: true,
-                reducedSignalSpacing: true
+                reducedSignalSpacing: true,
+                // 🚀 AGGRESSIVE WEIGHTS (Total = 1.0) - Opportunity-focused
+                gexWeight: 0.0,      // DISABLED
+                avpWeight: 0.15,     // LOW - Less conservative filtering
+                avwapWeight: 0.45,   // HIGHEST - Strong trend following
+                fractalWeight: 0.30, // HIGH - Aggressive entries
+                atrWeight: 0.10      // STANDARD - Risk management
             }
         };
 
@@ -629,8 +648,8 @@ class TradingDashboard {
             }
         });
         
-        // Load balanced advanced preset by default
-        this.loadAdvancedPreset('balanced-adv');
+        // Load balanced preset by default (with GEX disabled)
+        this.loadPreset('balanced');
     }
 
     applyParameters() {
@@ -645,6 +664,26 @@ class TradingDashboard {
         } else {
             this.addLog('Not connected to trading engine', 'error');
         }
+    }
+
+    // 🔧 MISSING PRESET BUTTON HANDLERS - Add event listeners for preset buttons
+    initializePresetButtons() {
+        const presetButtons = document.querySelectorAll('.preset-btn');
+        presetButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const presetName = e.target.getAttribute('data-preset');
+                console.log(`🎯 Loading preset: ${presetName}`);
+                
+                // Update active button
+                presetButtons.forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // Load the preset with correct weights
+                this.loadPreset(presetName);
+                
+                this.addLog(`Loaded ${presetName} preset with optimized weights`, 'success');
+            });
+        });
     }
 
     handlePeriodChange(period) {
