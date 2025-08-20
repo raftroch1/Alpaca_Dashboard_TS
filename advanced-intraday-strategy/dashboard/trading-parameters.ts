@@ -175,10 +175,10 @@ export class ParameterPresets {
       enableBreakoutSignals: true,
       enableTimeBasedSignals: true,
       
-      usePartialProfitTaking: false,
-      partialProfitLevel: 0.30,
-      partialProfitSize: 0.50,
-      moveStopToBreakeven: false,
+      usePartialProfitTaking: true,  // ✅ ENABLE PARTIAL PROFIT
+      partialProfitLevel: 0.30,      // Take partial at 30%
+      partialProfitSize: 0.50,       // Take 50% of position
+      moveStopToBreakeven: true,     // Move stop to breakeven after partial
       reducedSignalSpacing: false,
       
       // Institutional features - balanced settings

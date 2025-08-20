@@ -129,7 +129,8 @@ export class DirectInstitutionalBacktestRunner {
             currentData,
             optionsChain,
             25000,  // Account balance
-            relaxedDirectConfig  // Use relaxed thresholds (0.5 vs 0.7 confluence)
+            relaxedDirectConfig,  // Use relaxed thresholds (0.5 vs 0.7 confluence)
+            parameters  // ✅ PASS ALL DASHBOARD PARAMETERS for RSI, MACD, risk management
           );
           
           if (signal && signal.action !== 'NO_TRADE') {
@@ -151,7 +152,7 @@ export class DirectInstitutionalBacktestRunner {
             // Track signal types (simplified)
             signalBreakdown.gexSignals++;
             
-            console.log(`📊 Trade ${trades.length}: ${signal.action} → P&L: ${trade.pnl >= 0 ? '+' : ''}$${trade.pnl.toFixed(2)}`);
+            console.log(`📊 Trade ${trades.length}: ${signal.action} → P&L: ${trade.pnl >= 0 ? '+' : ''}$${trade.pnl.toFixed(2)} (${trade.exitReason || 'STANDARD'})`);
           }
           
         } catch (error) {
@@ -366,17 +367,43 @@ export class DirectInstitutionalBacktestRunner {
         return null;
       }
       
-      // Exit simulation using dashboard parameters
+      // 📈 ADVANCED EXIT SIMULATION - Partial Profit Taking Support
       const random = Math.random();
       const isWinner = random < (signal.confidence || 0.65);
       
-      let exitPrice, pnl;
+      let exitPrice, pnl, exitReason;
+      
       if (isWinner) {
-        exitPrice = entryPrice * (1 + parameters.profitTargetPct);
-        pnl = (exitPrice - entryPrice) * quantity * 100;
+        // 🎯 PARTIAL PROFIT SIMULATION (if enabled)
+        if (parameters.usePartialProfitTaking) {
+          // Simulate partial profit taking at partialProfitLevel (30% default)
+          const partialProfitPrice = entryPrice * (1 + parameters.partialProfitLevel);
+          const finalProfitPrice = entryPrice * (1 + parameters.profitTargetPct);
+          
+          // Calculate partial profit (50% of position at 30% gain)
+          const partialQuantity = Math.floor(quantity * parameters.partialProfitSize);
+          const remainingQuantity = quantity - partialQuantity;
+          
+          const partialPnL = (partialProfitPrice - entryPrice) * partialQuantity * 100;
+          const finalPnL = (finalProfitPrice - entryPrice) * remainingQuantity * 100;
+          
+          exitPrice = finalProfitPrice; // Final exit price
+          pnl = partialPnL + finalPnL;  // Combined P&L
+          exitReason = `PARTIAL_PROFIT(${partialQuantity}@${(parameters.partialProfitLevel*100).toFixed(0)}%)+FINAL(${remainingQuantity}@${(parameters.profitTargetPct*100).toFixed(0)}%)`;
+          
+          console.log(`   📈 PARTIAL PROFIT SIM: ${partialQuantity} contracts @ +${(parameters.partialProfitLevel*100).toFixed(0)}% = +$${partialPnL.toFixed(2)}`);
+          console.log(`   🎯 FINAL PROFIT SIM: ${remainingQuantity} contracts @ +${(parameters.profitTargetPct*100).toFixed(0)}% = +$${finalPnL.toFixed(2)}`);
+        } else {
+          // Standard full profit target
+          exitPrice = entryPrice * (1 + parameters.profitTargetPct);
+          pnl = (exitPrice - entryPrice) * quantity * 100;
+          exitReason = `PROFIT_TARGET(${(parameters.profitTargetPct*100).toFixed(0)}%)`;
+        }
       } else {
+        // Stop loss exit
         exitPrice = entryPrice * (1 - parameters.initialStopLossPct);
         pnl = (exitPrice - entryPrice) * quantity * 100;
+        exitReason = `STOP_LOSS(${(parameters.initialStopLossPct*100).toFixed(0)}%)`;
       }
       
       return {
@@ -387,7 +414,9 @@ export class DirectInstitutionalBacktestRunner {
         timestamp: currentBar.date,
         confidence: signal.confidence,
         strike: selectedOption.strike,
-        quantity: quantity
+        quantity: quantity,
+        exitReason: exitReason,  // ✅ Track partial profit vs normal exit
+        partialProfitUsed: parameters.usePartialProfitTaking
       };
       
     } catch (error) {
@@ -610,16 +639,16 @@ export class DirectInstitutionalBacktestRunner {
         `   ATR Weight: ${parameters.atrWeight || 0.10}`,
         '',
         '═══════════════════════════════════════════════════════════════',
-        '�� LAST 10 TRADES DETAILS:',
+        '📋 ALL TRADES DETAILS:',
         '═══════════════════════════════════════════════════════════════',
         '#   | Action    | Strike | Entry  | Exit   | P&L     | %      | Result',
         '────┼───────────┼────────┼────────┼────────┼─────────┼────────┼──────'
       ];
 
-      // Add last 10 trades to the log
-      const last10Trades = trades.slice(-10);
-      last10Trades.forEach((trade, index) => {
-        const tradeNum = trades.length - last10Trades.length + index + 1;
+      // Add ALL trades to the log
+      const allTrades = trades;
+      allTrades.forEach((trade, index) => {
+        const tradeNum = index + 1;
         const pnlPercent = ((trade.exitPrice - trade.entryPrice) / trade.entryPrice) * 100;
         const result = trade.pnl > 0 ? 'WIN ✅' : 'LOSS❌';
         const action = trade.signal.padEnd(9);
@@ -638,15 +667,15 @@ export class DirectInstitutionalBacktestRunner {
 
       logContent.push('═══════════════════════════════════════════════════════════════');
       
-      // Summary of last 10 trades
-      const last10Wins = last10Trades.filter(t => t.pnl > 0).length;
-      const last10WinRate = (last10Wins / last10Trades.length) * 100;
-      const last10PnL = last10Trades.reduce((sum, t) => sum + t.pnl, 0);
+      // Summary of all trades (matches overall performance)
+      const allWins = allTrades.filter(t => t.pnl > 0).length;
+      const allWinRate = (allWins / allTrades.length) * 100;
+      const allPnL = allTrades.reduce((sum, t) => sum + t.pnl, 0);
       
       logContent.push('');
-      logContent.push('📊 LAST 10 TRADES PERFORMANCE:');
-      logContent.push(`   🎯 Win Rate: ${last10Wins}/${last10Trades.length} (${last10WinRate.toFixed(1)}%)`);
-      logContent.push(`   💰 Total P&L: ${last10PnL >= 0 ? '+' : ''}$${last10PnL.toFixed(2)}`);
+      logContent.push('📊 ALL TRADES PERFORMANCE:');
+      logContent.push(`   🎯 Win Rate: ${allWins}/${allTrades.length} (${allWinRate.toFixed(1)}%)`);
+      logContent.push(`   💰 Total P&L: ${allPnL >= 0 ? '+' : ''}$${allPnL.toFixed(2)}`);
       logContent.push('');
       logContent.push('🔄 Compare these results with your Live Paper Trading!');
 
@@ -733,6 +762,28 @@ export class DirectInstitutionalBacktestRunner {
     
     return stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252) : 0; // Annualized
   }
+}
+
+// 🧪 MAIN EXECUTION FOR TESTING (when run directly)
+if (require.main === module) {
+  console.log('🧪 TESTING INTEGRATED SYSTEM...');
+  
+  // Import trading parameters
+  import('./trading-parameters').then(({ ParameterPresets }) => {
+    const testParams = ParameterPresets.BALANCED.parameters;
+    
+    console.log(`📊 Testing with: Partial Profit=${testParams.usePartialProfitTaking}, Level=${(testParams.partialProfitLevel*100).toFixed(0)}%`);
+    
+    DirectInstitutionalBacktestRunner.runDirectInstitutionalBacktest(
+      testParams,
+      '1Min',
+      3
+    ).then(results => {
+      console.log('🎯 TEST COMPLETED');
+    }).catch(error => {
+      console.error('❌ TEST FAILED:', error);
+    });
+  });
 }
 
 export default DirectInstitutionalBacktestRunner;

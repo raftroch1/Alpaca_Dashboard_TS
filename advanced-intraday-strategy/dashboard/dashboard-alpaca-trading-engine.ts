@@ -58,6 +58,9 @@ interface DashboardTrade {
   pnl?: number;
   trailingStopPrice?: number;
   initialStopLoss?: number;
+  // ✅ PARTIAL PROFIT TAKING PROPERTIES
+  partialProfitTaken?: boolean;
+  partialProfitAmount?: number;
 }
 
 export class DashboardAlpacaTradingEngine {
@@ -517,7 +520,8 @@ export class DashboardAlpacaTradingEngine {
         marketData,
         optionsChain,
         25000,  // Account balance (same as backtest)
-        institutionalConfig  // Same config as backtest, read from dashboard
+        institutionalConfig,  // Same config as backtest, read from dashboard
+        this.parameters  // ✅ PASS ALL DASHBOARD PARAMETERS for RSI, MACD, risk management
       );
       
       if (signal && signal.action !== 'NO_TRADE') {
@@ -882,9 +886,42 @@ export class DashboardAlpacaTradingEngine {
     }
     
     // Partial profit taking logic
-    if (this.parameters.usePartialProfitTaking && profitPct >= this.parameters.partialProfitLevel) {
-      console.log(`📈 DASH partial profit taking triggered at ${(profitPct * 100).toFixed(1)}%`);
-      // TODO: Implement partial exit logic when needed
+    if (this.parameters.usePartialProfitTaking && profitPct >= this.parameters.partialProfitLevel && !trade.partialProfitTaken) {
+      console.log(`📈 DASH PARTIAL PROFIT TRIGGERED at ${(profitPct * 100).toFixed(1)}%`);
+      
+      const partialSize = Math.floor(trade.quantity * this.parameters.partialProfitSize);
+      const remainingSize = trade.quantity - partialSize;
+      
+      console.log(`   💰 Taking partial profit: ${partialSize}/${trade.quantity} contracts`);
+      console.log(`   🔄 Remaining position: ${remainingSize} contracts`);
+      
+      try {
+        // Close partial position with Alpaca
+        const partialOrder = await this.alpaca.createOrder({
+          symbol: trade.symbol,
+          qty: partialSize,
+          side: 'sell',
+          type: 'market',
+          time_in_force: 'day'
+        });
+        
+        if (partialOrder) {
+          // Update trade with partial profit taken
+          trade.quantity = remainingSize;
+          trade.partialProfitTaken = true;
+          trade.partialProfitAmount = partialSize * currentValue;
+          
+          // Move stop to breakeven on remaining position
+          if (this.parameters.moveStopToBreakeven) {
+            trade.initialStopLoss = trade.entryPrice;
+            console.log(`   🛡️ Stop moved to breakeven: $${trade.entryPrice.toFixed(2)}`);
+          }
+          
+          console.log(`✅ PARTIAL PROFIT EXECUTED: +$${(partialSize * currentValue).toFixed(2)}`);
+        }
+      } catch (error: any) {
+        console.log(`❌ PARTIAL PROFIT FAILED: ${error.message}`);
+      }
     }
   }
 

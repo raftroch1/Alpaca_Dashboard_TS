@@ -17,6 +17,8 @@ import AnchoredVolumeProfile, { AVPSnapshot } from './anchored-volume-profile';
 import AnchoredVWAP, { AVWAPSnapshot } from './anchored-vwap';
 import MicrofractalFibonacci, { MicrofractalSnapshot } from './microfractal-fibonacci';
 import EnhancedATRRiskManager, { ATRSnapshot } from './enhanced-atr-risk-mgmt';
+import { MarketRegimeDetector } from '../../../lib/market-regime-detector';
+import { MarketBiasDetector } from './market-bias-detector';
 
 export interface DirectIntegrationConfig {
   // Scoring weights (not filters!)
@@ -96,7 +98,8 @@ export class DirectInstitutionalIntegration {
     marketData: MarketData[],
     optionsChain: OptionsChain[],
     accountBalance: number = 25000,
-    config: Partial<DirectIntegrationConfig> = {}
+    config: Partial<DirectIntegrationConfig> = {},
+    dashboardParams?: any // Accept dashboard parameters
   ): Promise<DirectSignal> {
     
     const fullConfig = { ...this.DEFAULT_CONFIG, ...config };
@@ -209,25 +212,69 @@ export class DirectInstitutionalIntegration {
     
     console.log(`🚫 FORCED GEX TO 0 - Calculation: AVP(${avpScore.toFixed(2)}×${fullConfig.avpWeight}) + AVWAP(${avwapScore.toFixed(2)}×${fullConfig.avwapWeight}) + Fractals(${fractalScore.toFixed(2)}×${fullConfig.fractalWeight}) + ATR(${atrScore.toFixed(2)}×${fullConfig.atrWeight}) = ${totalScore.toFixed(2)}`);
     
+    // 🏛️ PROFESSIONAL MARKET BIAS DETECTION - Advanced Market Internals
+    const marketBias = MarketBiasDetector.detectBias(marketData, optionsChain, undefined, dashboardParams);
+    
+    console.log(`🏛️ MARKET BIAS: ${marketBias.bias} (${marketBias.confidence}% confidence, ${marketBias.strength.toFixed(2)} strength)`);
+    console.log(`📊 INTERNALS: VIX(${marketBias.internals.vixSignal}) | Volume(${marketBias.internals.volumeSignal}) | Momentum(${marketBias.internals.momentumSignal}) | Options(${marketBias.internals.breadthSignal}) | Price(${marketBias.internals.sectorRotation})`);
+    
+    // Use institutional scores for signal QUALITY, market bias for DIRECTION
+    let finalScore = totalScore;
+    let action: DirectSignal['action'] = 'NO_TRADE';
+    let reasoning = 'Insufficient confluence for trade';
+    
+    // Only trade if we have reasonable confidence in bias detection AND institutional confluence
+    if (marketBias.confidence >= 50) {
+      
+      // Use institutional scoring for trade quality (strength)
+      const institutionalStrength = Math.abs(totalScore);
+      const biasStrength = marketBias.strength;
+      
+      // Combined strength: institutional confluence + market bias confidence
+      const combinedStrength = (institutionalStrength + biasStrength) / 2;
+      
+      if (combinedStrength >= 0.3) { // Minimum combined strength
+        
+        switch (marketBias.bias) {
+          case 'BULLISH':
+            action = 'BUY_CALL';
+            finalScore = combinedStrength; // Keep positive
+            reasoning = `BULLISH bias (${marketBias.confidence}%) + institutional confluence (${institutionalStrength.toFixed(2)})`;
+            console.log(`🟢 BIAS-DRIVEN: BULLISH INTERNALS → BUY_CALL`);
+            break;
+            
+          case 'BEARISH':
+            action = 'BUY_PUT';
+            finalScore = -combinedStrength; // Make negative
+            reasoning = `BEARISH bias (${marketBias.confidence}%) + institutional confluence (${institutionalStrength.toFixed(2)})`;
+            console.log(`🔴 BIAS-DRIVEN: BEARISH INTERNALS → BUY_PUT`);
+            break;
+            
+          case 'NEUTRAL':
+            action = 'NO_TRADE';
+            finalScore = 0;
+            reasoning = `NEUTRAL bias - mixed market internals`;
+            console.log(`⚪ BIAS-DRIVEN: NEUTRAL INTERNALS → NO_TRADE`);
+            break;
+        }
+      } else {
+        reasoning = `${marketBias.bias} bias but insufficient combined strength (${combinedStrength.toFixed(2)} < 0.3)`;
+        console.log(`⚠️ BIAS-DRIVEN: ${marketBias.bias} but weak combined signal`);
+      }
+    } else {
+      reasoning = `Low bias confidence (${marketBias.confidence}%) - mixed market internals`;
+      console.log(`⚠️ BIAS-DRIVEN: Low confidence ${marketBias.confidence}%`);
+    }
+    
     console.log(`\n📊 SCORING RESULTS:`);
     console.log(`   GEX: 0.00 (DISABLED - was causing bullish bias)`);
     console.log(`   AVP: ${avpScore.toFixed(2)} (weight: ${fullConfig.avpWeight})`);
     console.log(`   AVWAP: ${avwapScore.toFixed(2)} (weight: ${fullConfig.avwapWeight})`);
     console.log(`   Fractals: ${fractalScore.toFixed(2)} (weight: ${fullConfig.fractalWeight})`);
     console.log(`   ATR: ${atrScore.toFixed(2)} (weight: ${fullConfig.atrWeight})`);
-    console.log(`   TOTAL: ${totalScore.toFixed(2)}`);
+    console.log(`   TOTAL: ${finalScore.toFixed(2)} (REGIME-BASED DIRECTION)`);
     
-    // Determine action based on score
-    let action: DirectSignal['action'] = 'NO_TRADE';
-    let reasoning = 'Insufficient confluence for trade';
-    
-    if (totalScore >= fullConfig.minimumBullishScore) {
-      action = this.determineBullishAction(gexAnalysis, totalScore);
-      reasoning = `Bullish confluence detected (score: ${totalScore.toFixed(2)})`;
-    } else if (totalScore <= -fullConfig.minimumBearishScore) {
-      action = this.determineBearishAction(gexAnalysis, totalScore);
-      reasoning = `Bearish confluence detected (score: ${Math.abs(totalScore).toFixed(2)})`;
-    }
+    // Action is now determined by market regime detection above
     
     // Select best option and calculate position sizing
     let selectedOption: OptionsChain | undefined;
@@ -268,14 +315,14 @@ export class DirectInstitutionalIntegration {
     
     return {
       action,
-      confidence: Math.abs(totalScore),
+      confidence: Math.abs(finalScore),
       reasoning,
       gexScore,
       avpScore,
       avwapScore,
       fractalScore,
       atrScore,
-      totalScore,
+      totalScore: finalScore,
       entryPrice,
       positionSize,
       maxRisk,
