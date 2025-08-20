@@ -245,10 +245,18 @@ export class DashboardServer {
       await this.dashboardTradingEngine.startDashboardPaperTrading();
       this.isTrading = true;
 
-      console.log('✅ REAL Dashboard paper trading started with Alpaca integration');
-      console.log('🎯 Daily target:', this.currentParameters.dailyPnLTarget);
-      console.log('🛡️ Stop loss:', (this.currentParameters.initialStopLossPct * 100).toFixed(1) + '%');
-      console.log('📈 Profit target:', (this.currentParameters.profitTargetPct * 100).toFixed(1) + '%');
+      console.log('✅ INSTITUTIONAL PAPER TRADING STARTED');
+      console.log('🏛️ Using SAME institutional features as backtest:');
+      console.log(`   📊 GEX Analysis: ${this.currentParameters.enableGEXFilters ? 'ON' : 'OFF'} (weight: ${this.currentParameters.gexWeight || 0.30})`);
+      console.log(`   📈 Volume Profile: ${this.currentParameters.enableVolumeProfile ? 'ON' : 'OFF'} (weight: ${this.currentParameters.avpWeight || 0.20})`);
+      console.log(`   🔍 AVWAP Analysis: ${this.currentParameters.enableMicrofractals ? 'ON' : 'OFF'} (weight: ${this.currentParameters.avwapWeight || 0.20})`);
+      console.log(`   🌀 Microfractals: ${this.currentParameters.enableMicrofractals ? 'ON' : 'OFF'} (weight: ${this.currentParameters.fractalWeight || 0.20})`);
+      console.log(`   ⚡ ATR Risk Mgmt: ${this.currentParameters.enableATRRiskManagement ? 'ON' : 'OFF'} (weight: ${this.currentParameters.atrWeight || 0.10})`);
+      console.log('🎯 Trading Parameters:');
+      console.log(`   💰 Daily target: $${this.currentParameters.dailyPnLTarget}`);
+      console.log(`   🛡️ Stop loss: ${(this.currentParameters.initialStopLossPct * 100).toFixed(1)}%`);
+      console.log(`   📈 Profit target: ${(this.currentParameters.profitTargetPct * 100).toFixed(1)}%`);
+      console.log(`   🎯 Min confluence: ${this.currentParameters.minimumBullishScore || 0.5}`);
       console.log('🏷️ Trade prefix: DASH_ (isolated from main strategy)');
 
       // Start real live updates instead of simulation

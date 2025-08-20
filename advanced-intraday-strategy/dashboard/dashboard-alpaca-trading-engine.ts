@@ -58,6 +58,9 @@ interface DashboardTrade {
   pnl?: number;
   trailingStopPrice?: number;
   initialStopLoss?: number;
+  // ✅ PARTIAL PROFIT TAKING PROPERTIES
+  partialProfitTaken?: boolean;
+  partialProfitAmount?: number;
 }
 
 export class DashboardAlpacaTradingEngine {
@@ -353,6 +356,90 @@ export class DashboardAlpacaTradingEngine {
     }, 10000); // Every 10 seconds
   }
 
+
+  /**
+   * Generate realistic options chain (SAME AS BACKTEST for consistency)
+   */
+  private generateRealisticOptionsChain(currentPrice: number, date: Date): any[] {
+    const options = [];
+    const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
+    
+    console.log(`📊 PAPER TRADING: Using same realistic options as backtest for SPY at $${currentPrice.toFixed(2)}`);
+    
+    // Generate realistic 0-DTE options around current price (±$10 range)
+    for (let i = -10; i <= 10; i++) {
+      const strike = Math.round(currentPrice) + i;
+      const moneyness = (currentPrice - strike) / currentPrice;
+      
+      // CALL options with realistic institutional Greeks
+      const callDelta = Math.max(0.01, Math.min(0.99, 
+        strike <= currentPrice ? 0.85 - Math.abs(moneyness) * 5 : // ITM
+        0.50 * Math.exp(-Math.abs(moneyness) * 20) // OTM
+      ));
+      
+      // Realistic 0-DTE pricing based on moneyness (SAME AS BACKTEST)
+      let callPrice;
+      if (Math.abs(moneyness) < 0.003) {
+        callPrice = 2.00 + Math.random() * 1.00; // ATM: $2.00-3.00
+      } else if (Math.abs(moneyness) < 0.008) {
+        callPrice = 1.25 + Math.random() * 0.75; // Near ATM: $1.25-2.00
+      } else if (Math.abs(moneyness) < 0.015) {
+        callPrice = 0.50 + Math.random() * 0.50; // OTM: $0.50-1.00
+      } else {
+        callPrice = 0.05 + Math.random() * 0.25; // Far OTM: $0.05-0.30
+      }
+      
+      options.push({
+        symbol: `SPY${dateStr.slice(2)}C${String(strike * 1000).padStart(8, '0')}`,
+        strike: strike,
+        side: 'CALL',
+        bid: callPrice * 0.95,
+        ask: callPrice * 1.05,
+        delta: callDelta,
+        last: callPrice,
+        volume: Math.floor(Math.random() * 500) + 10,
+        openInterest: Math.floor(Math.random() * 2000) + 100,
+        impliedVolatility: 0.15 + Math.random() * 0.30,
+        expiration: new Date()
+      });
+      
+      // PUT options with realistic institutional Greeks
+      const putDelta = Math.max(-0.99, Math.min(-0.01,
+        strike >= currentPrice ? -0.85 + Math.abs(moneyness) * 5 : // ITM
+        -0.50 * Math.exp(-Math.abs(moneyness) * 20) // OTM
+      ));
+      
+      // Realistic PUT pricing (SAME AS BACKTEST)
+      let putPrice;
+      if (Math.abs(moneyness) < 0.003) {
+        putPrice = 2.00 + Math.random() * 1.00; // ATM
+      } else if (Math.abs(moneyness) < 0.008) {
+        putPrice = 1.25 + Math.random() * 0.75; // Near ATM
+      } else if (Math.abs(moneyness) < 0.015) {
+        putPrice = 0.50 + Math.random() * 0.50; // OTM
+      } else {
+        putPrice = 0.05 + Math.random() * 0.25; // Far OTM
+      }
+      
+      options.push({
+        symbol: `SPY${dateStr.slice(2)}P${String(strike * 1000).padStart(8, '0')}`,
+        strike: strike,
+        side: 'PUT',
+        bid: putPrice * 0.95,
+        ask: putPrice * 1.05,
+        delta: putDelta,
+        last: putPrice,
+        volume: Math.floor(Math.random() * 500) + 10,
+        openInterest: Math.floor(Math.random() * 2000) + 100,
+        impliedVolatility: 0.15 + Math.random() * 0.30,
+        expiration: new Date()
+      });
+    }
+    
+    console.log(`✅ PAPER TRADING: Generated ${options.length} realistic options (SAME LOGIC AS BACKTEST)`);
+    return options;
+  }
+
   private async getCurrentMarketData(): Promise<MarketData[]> {
     try {
       const endTime = new Date();
@@ -402,7 +489,7 @@ export class DashboardAlpacaTradingEngine {
       return null;
     }
     
-    console.log(`🏛️ DASH: Using DirectInstitutionalIntegration (PROVEN)`);
+    console.log(`🏛️ DASH: Using DirectInstitutionalIntegration (SAME AS BACKTEST)`);
     
     if (marketData.length < 50) {
       console.log(`⚠️ DASH: Insufficient data - only ${marketData.length} bars (need 50 for institutional signals)`);
@@ -410,21 +497,39 @@ export class DashboardAlpacaTradingEngine {
     }
     
     try {
-      // Get options chain
-      const optionsChain = await alpacaHTTPClient.getOptionsChain('SPY');
+      // Use SAME realistic options generator as backtest
+      const optionsChain = this.generateRealisticOptionsChain(currentBar.close, currentBar.date);
       
-      // 🚀 USE OUR PROVEN DirectInstitutionalIntegration
-      const DirectInstitutionalIntegration = await import('../../clean-strategy/core/institutional-strategy/direct-institutional-integration');
-      const signal = await DirectInstitutionalIntegration.default.generateDirectSignal(
+      // 🚀 USE EXACT SAME METHOD AS BACKTEST - DirectInstitutionalIntegration
+      const { DirectInstitutionalIntegration } = await import('../../clean-strategy/core/institutional-strategy/direct-institutional-integration');
+      
+      // Use EXACT SAME config as backtest - GEX DISABLED for trend following
+      const institutionalConfig = {
+        gexWeight: 0.0,   // FORCE DISABLED - was causing bullish bias
+        avpWeight: this.parameters.avpWeight || 0.25,
+        avwapWeight: this.parameters.avwapWeight || 0.40,  // MAJOR WEIGHT - trend following
+        fractalWeight: this.parameters.fractalWeight || 0.25,
+        atrWeight: this.parameters.atrWeight || 0.10,
+        minimumBullishScore: this.parameters.minimumBullishScore || 0.5,
+        minimumBearishScore: this.parameters.minimumBearishScore || 0.5,
+        riskMultiplier: this.parameters.riskMultiplier || 1.0,
+        maxPositionSize: this.parameters.maxPositionSize || 0.02
+      };
+      
+      const signal = await DirectInstitutionalIntegration.generateDirectSignal(
         marketData,
-        optionsChain
+        optionsChain,
+        25000,  // Account balance (same as backtest)
+        institutionalConfig,  // Same config as backtest, read from dashboard
+        this.parameters  // ✅ PASS ALL DASHBOARD PARAMETERS for RSI, MACD, risk management
       );
       
       if (signal && signal.action !== 'NO_TRADE') {
         
-        console.log(`🏛️ DIRECT INSTITUTIONAL SIGNAL: ${signal.action}`);
-        console.log(`📊 Confidence: ${(signal.confidence * 100).toFixed(1)}%`);
+        console.log(`🏛️ PAPER TRADING - INSTITUTIONAL SIGNAL: ${signal.action}`);
+        console.log(`📊 Confidence: ${(signal.confidence * 100).toFixed(1)}% (SAME AS BACKTEST)`);
         console.log(`🔍 Reasoning: ${signal.reasoning}`);
+        console.log(`🎯 Using: GEX(0.0-DISABLED), AVP(${institutionalConfig.avpWeight}), AVWAP(${institutionalConfig.avwapWeight}), Fractals(${institutionalConfig.fractalWeight}), ATR(${institutionalConfig.atrWeight})`);
         
         // Map our DirectInstitutional signals to dashboard format
         let dashboardAction: 'BUY_CALL' | 'BUY_PUT' | 'NO_TRADE';
@@ -442,20 +547,20 @@ export class DashboardAlpacaTradingEngine {
             dashboardAction = 'NO_TRADE';
         }
 
-        // Convert to dashboard format
+        // Convert to dashboard format (same confidence and reasoning as backtest)
         return {
           action: dashboardAction,
           confidence: signal.confidence,
           reasoning: [signal.reasoning],
-          signalType: 'SOPHISTICATED',
+          signalType: 'SOPHISTICATED',  // Using sophisticated for institutional signals
           targetProfit: this.parameters.profitTargetPct,
           maxLoss: this.parameters.initialStopLossPct,
-          quality: signal.confidence > 0.8 ? 'EXCELLENT' : 'GOOD'
+          quality: signal.confidence > 0.8 ? 'EXCELLENT' : signal.confidence > 0.6 ? 'GOOD' : 'FAIR'
         };
       }
       
     } catch (error) {
-      console.log('⚠️ Direct institutional signal generation error, using fallback');
+      console.log('⚠️ Direct institutional signal generation error');
       console.error(error);
     }
     
@@ -519,27 +624,69 @@ export class DashboardAlpacaTradingEngine {
       const accountInfo = await this.alpaca.getAccount();
       const portfolioValue = parseFloat(accountInfo.portfolio_value);
       
-      // Use dashboard risk parameters (same as main but with dashboard parameters)
-      const maxRisk = Math.min(300, portfolioValue * this.parameters.maxRiskPerTradePct);
+      // 🎯 RESPECT DASHBOARD MAX RISK PER TRADE SETTING
+      const maxRiskPerTrade = portfolioValue * this.parameters.maxRiskPerTradePct;
       const currentPrice = currentBar.close;
       
-      // Calculate position size (same logic as main strategy)
-      const estimatedOptionPrice = currentPrice * 0.10; // Rough estimate
-      const quantity = Math.max(2, Math.min(4, Math.floor(maxRisk / (estimatedOptionPrice * 100))));
+      console.log(`💰 POSITION SIZING - RESPECTING YOUR SETTINGS:`);
+      console.log(`   Portfolio Value: $${portfolioValue.toLocaleString()}`);
+      console.log(`   Max Risk Per Trade Setting: ${(this.parameters.maxRiskPerTradePct * 100).toFixed(1)}%`);
+      console.log(`   Max Risk Per Trade: $${maxRiskPerTrade.toFixed(2)}`);
+      
+      // Better option price estimation for 0-DTE
+      const strike = this.calculateStrike(currentPrice, signal.action as 'BUY_CALL' | 'BUY_PUT');
+      const strikeDistance = Math.abs(currentPrice - strike) / currentPrice;
+      
+      // FIXED: Realistic 0-DTE option pricing (dollar amounts per share)
+      let estimatedOptionPrice;
+      if (strikeDistance < 0.002) { // Very close to ATM (within $1-2)
+        estimatedOptionPrice = 2.00; // $2.00 per share for ATM 0-DTE
+      } else if (strikeDistance < 0.008) { // Near ATM (within $5)
+        estimatedOptionPrice = 1.25; // $1.25 per share for near ATM
+      } else if (strikeDistance < 0.020) { // Moderate OTM
+        estimatedOptionPrice = 0.75; // $0.75 per share for moderate OTM
+      } else { // Far OTM
+        estimatedOptionPrice = 0.35; // $0.35 per share for far OTM
+      }
+      
+      // Calculate quantity to stay within YOUR risk limit (no hard-coded caps)
+      const maxQuantity = Math.floor(maxRiskPerTrade / (estimatedOptionPrice * 100));
+      const quantity = Math.max(1, maxQuantity); // At least 1 contract, but respect your limit
+      
+      const actualRisk = quantity * estimatedOptionPrice * 100;
+      
+      console.log(`   Strike: $${strike.toFixed(2)} (${(strikeDistance * 100).toFixed(2)}% from current)`);
+      console.log(`   Estimated Option Price: $${estimatedOptionPrice.toFixed(2)}`);
+      console.log(`   Calculated Quantity: ${quantity} contracts`);
+      console.log(`   Actual Position Risk: $${actualRisk.toFixed(2)}`);
+      console.log(`   ✅ Within Risk Limit: ${actualRisk <= maxRiskPerTrade ? 'YES' : 'NO'}`);
+      
+      // Safety check - reject if position would exceed risk limit
+      if (actualRisk > maxRiskPerTrade) {
+        console.log(`🚫 POSITION REJECTED - Would exceed max risk of $${maxRiskPerTrade.toFixed(2)}`);
+        return;
+      }
       
       // Generate dashboard-specific client order ID
       const clientOrderId = `${this.TRADE_PREFIX}${this.SYMBOL}_${Date.now()}`;
       
-      // Calculate option symbol for real order
-      const strike = this.calculateStrike(currentPrice, signal.action as 'BUY_CALL' | 'BUY_PUT');
+      // Generate proper Alpaca option symbol format
       const today = new Date();
-      const expiry = `${today.getFullYear().toString().slice(-2)}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+      
+      // Use proper Alpaca option symbol format: SPY240818C00643000
+      const year = today.getFullYear().toString().slice(-2);
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
       const optionType = signal.action === 'BUY_CALL' ? 'C' : 'P';
-      const optionSymbol = `SPY${expiry}${String(strike * 1000).padStart(8, '0')}${optionType}`;
+      const strikeFormatted = String(Math.round(strike * 1000)).padStart(8, '0');
+      const optionSymbol = `SPY${year}${month}${day}${optionType}${strikeFormatted}`;
+      
+      console.log(`🔧 Generated option symbol: ${optionSymbol} (Fixed Alpaca format)`);
+      const actualStrike = strike;
       
       console.log(`🎯 DASH Submitting REAL Order: ${signal.action} ${quantity} contracts`);
       console.log(`📋 Option Symbol: ${optionSymbol}`);
-      console.log(`💰 Strike: $${strike}, Risk: $${maxRisk.toFixed(2)}`);
+      console.log(`💰 Strike: $${actualStrike}, Risk: $${actualRisk.toFixed(2)} (Max: $${maxRiskPerTrade.toFixed(2)})`);
       
       // 🚨 SUBMIT ACTUAL ORDER TO ALPACA (same as main strategy)
       const order = await this.alpaca.createOrder({
@@ -561,19 +708,27 @@ export class DashboardAlpacaTradingEngine {
         timestamp: currentBar.date,
         action: signal.action,
         symbol: optionSymbol,
-        strike,
+        strike: actualStrike,
         entryPrice: estimatedOptionPrice,
         quantity,
         signalType: signal.signalType,
         status: 'SUBMITTED'
       };
       
+      // ✅ CRITICAL FIX: Only track successful orders
       this.activeTrades.push(trade);
       this.dailyTradesGenerated++;
       this.lastSignalTime = currentBar.date.getTime();
       
-    } catch (error) {
+      console.log(`📈 Trade added to tracking: ${this.activeTrades.length}/${this.parameters.maxConcurrentPositions} active`);
+      
+    } catch (error: any) {
       console.error('❌ Dashboard trade execution error:', error);
+      console.log('🚫 Order failed - not adding to active trades to prevent position blocking');
+      
+      if (error.response && error.response.data) {
+        console.log(`🔍 Alpaca Error: ${error.response.data.message} (Code: ${error.response.data.code})`);
+      }
     }
   }
 
@@ -592,14 +747,25 @@ export class DashboardAlpacaTradingEngine {
     // Update order statuses with real Alpaca data
     await this.updateDashboardOrderStatuses();
     
-    const filledTrades = this.activeTrades.filter(t => t.status === 'FILLED');
-    if (filledTrades.length > 0) {
+    // Get real Alpaca positions to check P&L
+    const alpacaPositions = await this.alpaca.getPositions();
+    const dashboardPositions = alpacaPositions.filter((pos: any) => 
+      pos.symbol.includes('SPY') && pos.qty !== '0'
+    );
+    
+    if (dashboardPositions.length > 0) {
       const now = new Date();
-      console.log(`🔍 [${now.toLocaleTimeString()}] Dashboard checking exits for ${filledTrades.length} active trades`);
+      console.log(`🔍 [${now.toLocaleTimeString()}] REAL POSITION CHECK - ${dashboardPositions.length} active positions`);
       console.log(`📊 Current SPY Price: $${currentBar.close.toFixed(2)}`);
+      
+      // Check each real Alpaca position for exit conditions
+      for (const position of dashboardPositions) {
+        await this.checkRealPositionExit(position, currentBar);
+      }
     }
     
-    // Position management with dashboard parameters
+    // Also check our internal trade tracking
+    const filledTrades = this.activeTrades.filter(t => t.status === 'FILLED');
     for (const trade of filledTrades) {
       await this.checkDashboardTradeExits(trade, currentBar);
     }
@@ -720,9 +886,139 @@ export class DashboardAlpacaTradingEngine {
     }
     
     // Partial profit taking logic
-    if (this.parameters.usePartialProfitTaking && profitPct >= this.parameters.partialProfitLevel) {
-      console.log(`📈 DASH partial profit taking triggered at ${(profitPct * 100).toFixed(1)}%`);
-      // TODO: Implement partial exit logic when needed
+    if (this.parameters.usePartialProfitTaking && profitPct >= this.parameters.partialProfitLevel && !trade.partialProfitTaken) {
+      console.log(`📈 DASH PARTIAL PROFIT TRIGGERED at ${(profitPct * 100).toFixed(1)}%`);
+      
+      const partialSize = Math.floor(trade.quantity * this.parameters.partialProfitSize);
+      const remainingSize = trade.quantity - partialSize;
+      
+      console.log(`   💰 Taking partial profit: ${partialSize}/${trade.quantity} contracts`);
+      console.log(`   🔄 Remaining position: ${remainingSize} contracts`);
+      
+      try {
+        // Close partial position with Alpaca
+        const partialOrder = await this.alpaca.createOrder({
+          symbol: trade.symbol,
+          qty: partialSize,
+          side: 'sell',
+          type: 'market',
+          time_in_force: 'day'
+        });
+        
+        if (partialOrder) {
+          // Update trade with partial profit taken
+          trade.quantity = remainingSize;
+          trade.partialProfitTaken = true;
+          trade.partialProfitAmount = partialSize * currentValue;
+          
+          // Move stop to breakeven on remaining position
+          if (this.parameters.moveStopToBreakeven) {
+            trade.initialStopLoss = trade.entryPrice;
+            console.log(`   🛡️ Stop moved to breakeven: $${trade.entryPrice.toFixed(2)}`);
+          }
+          
+          console.log(`✅ PARTIAL PROFIT EXECUTED: +$${(partialSize * currentValue).toFixed(2)}`);
+        }
+      } catch (error: any) {
+        console.log(`❌ PARTIAL PROFIT FAILED: ${error.message}`);
+      }
+    }
+  }
+
+  private async checkRealPositionExit(position: any, currentBar: MarketData): Promise<void> {
+    try {
+      const symbol = position.symbol;
+      const quantity = Math.abs(parseInt(position.qty));
+      const marketValue = parseFloat(position.market_value);
+      const totalPnL = parseFloat(position.unrealized_pl);
+      const costBasis = parseFloat(position.cost_basis);
+      const currentPrice = marketValue / (quantity * 100); // Per-contract price
+      
+      console.log(`🔍 REAL POSITION: ${symbol}`);
+      console.log(`   💰 Market Value: $${marketValue} | P&L: $${totalPnL.toFixed(2)}`);
+      console.log(`   📊 Cost Basis: $${costBasis} | Current: $${currentPrice.toFixed(2)}`);
+      
+      // Calculate percentage P&L
+      const pnlPercent = totalPnL / Math.abs(costBasis);
+      
+      console.log(`   📈 P&L%: ${(pnlPercent * 100).toFixed(1)}%`);
+      
+      // CHECK STOP LOSS (35% loss)
+      if (pnlPercent <= -this.parameters.initialStopLossPct) {
+        console.log(`🛑 STOP LOSS TRIGGERED: ${(pnlPercent * 100).toFixed(1)}% <= -${(this.parameters.initialStopLossPct * 100).toFixed(0)}%`);
+        await this.closeAlpacaPosition(symbol, quantity, 'STOP_LOSS');
+        return;
+      }
+      
+      // CHECK PROFIT TARGET (50% gain)
+      if (pnlPercent >= this.parameters.profitTargetPct) {
+        console.log(`🎯 PROFIT TARGET HIT: ${(pnlPercent * 100).toFixed(1)}% >= ${(this.parameters.profitTargetPct * 100).toFixed(0)}%`);
+        await this.closeAlpacaPosition(symbol, quantity, 'PROFIT_TARGET');
+        return;
+      }
+      
+      // CHECK TIME-BASED EXIT (3:30 PM for 0-DTE)
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      const timeDecimal = hour + (minute / 60);
+      
+      if (timeDecimal >= this.parameters.forceExitTime) {
+        console.log(`⏰ FORCE EXIT TIME: ${hour}:${minute.toString().padStart(2, '0')} >= ${this.parameters.forceExitTime}`);
+        await this.closeAlpacaPosition(symbol, quantity, 'TIME_EXIT');
+        return;
+      }
+      
+    } catch (error) {
+      console.error('❌ Error checking real position exit:', error);
+    }
+  }
+
+  private async closeAlpacaPosition(symbol: string, quantity: number, reason: string): Promise<void> {
+    try {
+      console.log(`🚪 CLOSING POSITION: ${symbol} (${quantity} contracts) - ${reason}`);
+      
+      // Get current position P&L from Alpaca before closing
+      const positions = await this.alpaca.getPositions();
+      const position = positions.find((pos: any) => pos.symbol === symbol);
+      
+      let pnl = 0;
+      if (position) {
+        pnl = parseFloat(position.unrealized_pl);
+        console.log(`💰 Position P&L: $${pnl.toFixed(2)}`);
+      }
+      
+      // Submit sell order to close position
+      const closeOrder = await this.alpaca.createOrder({
+        symbol: symbol,
+        qty: quantity.toString(),
+        side: 'sell',
+        type: 'market',
+        time_in_force: 'day',
+        client_order_id: `${this.TRADE_PREFIX}CLOSE_${Date.now()}`
+      });
+      
+      console.log(`✅ CLOSE ORDER SUBMITTED: ${closeOrder.id}`);
+      
+      // Find and move the trade to completed with P&L
+      const tradeIndex = this.activeTrades.findIndex(t => t.symbol === symbol);
+      if (tradeIndex !== -1) {
+        const trade = this.activeTrades[tradeIndex];
+        trade.pnl = pnl;
+        trade.status = 'FILLED'; // Mark as completed
+        
+        // Move to completed trades for win rate calculation
+        this.completedTrades.push(trade);
+        this.activeTrades.splice(tradeIndex, 1);
+        
+        console.log(`📊 Trade completed: ${symbol} → P&L: $${pnl.toFixed(2)} (${reason})`);
+        console.log(`🎯 Updated stats: ${this.completedTrades.length} completed, ${this.activeTrades.length} active`);
+      } else {
+        console.log(`⚠️ Trade not found in activeTrades for symbol: ${symbol}`);
+      }
+      
+    } catch (error) {
+      console.error(`❌ Failed to close position ${symbol}:`, error);
     }
   }
 
@@ -730,9 +1026,26 @@ export class DashboardAlpacaTradingEngine {
     try {
       console.log(`🚪 Dashboard trade exit: ${trade.clientOrderId} - ${reason}`);
       
+      // Get current P&L from Alpaca position if available
+      if (!trade.pnl) {
+        const positions = await this.alpaca.getPositions();
+        const position = positions.find((pos: any) => pos.symbol === trade.symbol);
+        
+        if (position) {
+          trade.pnl = parseFloat(position.unrealized_pl);
+          console.log(`💰 Final P&L: $${trade.pnl.toFixed(2)}`);
+        } else {
+          // Fallback: estimate P&L if no position found
+          trade.pnl = 0;
+          console.log(`⚠️ No position found for P&L calculation, setting to $0`);
+        }
+      }
+      
       // Move to completed trades
       this.activeTrades = this.activeTrades.filter(t => t.id !== trade.id);
       this.completedTrades.push(trade);
+      
+      console.log(`📊 Trade moved to completed: ${this.completedTrades.length} total completed`);
       
     } catch (error) {
       console.error('❌ Dashboard trade exit error:', error);
@@ -754,7 +1067,26 @@ export class DashboardAlpacaTradingEngine {
     const winningTrades = this.completedTrades.filter(t => (t.pnl || 0) > 0).length;
     const winRate = this.completedTrades.length > 0 ? winningTrades / this.completedTrades.length : 0;
     
-    console.log(`📊 Dashboard Status: P&L: $${totalPnL.toFixed(2)}, Active: ${this.activeTrades.length}, Win Rate: ${(winRate * 100).toFixed(1)}%`);
+    console.log(`📊 INSTITUTIONAL PAPER TRADING STATUS:`);
+    this.debugPositionTracking();
+    console.log(`   💰 P&L: $${totalPnL.toFixed(2)} (Target: $${this.parameters.dailyPnLTarget})`);
+    console.log(`   📈 Active Positions: ${this.activeTrades.length}/${this.parameters.maxConcurrentPositions}`);
+    console.log(`   🎯 Win Rate: ${(winRate * 100).toFixed(1)}% (Backtest: 50.9%)`);
+    console.log(`   🏛️ Features: GEX(0.0-DISABLED), AVP(${this.parameters.avpWeight || 0.25}), AVWAP(${this.parameters.avwapWeight || 0.40}), Fractals(${this.parameters.fractalWeight || 0.25})`);
+  }
+
+
+  /**
+   * Debug position tracking issues
+   */
+  private debugPositionTracking(): void {
+    console.log(`🔍 POSITION TRACKING DEBUG:`);
+    console.log(`   Internal activeTrades: ${this.activeTrades.length}`);
+    console.log(`   Max allowed: ${this.parameters.maxConcurrentPositions}`);
+    
+    this.activeTrades.forEach((trade, index) => {
+      console.log(`   Trade ${index + 1}: ${trade.symbol} | Status: ${trade.status} | ID: ${trade.clientOrderId}`);
+    });
   }
 
   async getDashboardStats(): Promise<any> {

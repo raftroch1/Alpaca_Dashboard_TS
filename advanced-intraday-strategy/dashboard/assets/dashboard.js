@@ -16,8 +16,16 @@ class TradingDashboard {
         this.initializeUI();
         this.initializeWebSocket();
         this.bindEvents();
-        this.loadPreset('balanced'); // Start with balanced preset
+        
+        // 💾 Load saved parameters or use balanced preset
+        this.loadSavedParametersOrDefault();
         this.initializeAdvancedControls(); // Initialize advanced controls with defaults
+        this.initializePresetButtons(); // 🔧 CRITICAL FIX: Add preset button handlers
+        
+        // Hide GEX Controls since GEX is disabled by default
+        setTimeout(() => {
+            this.toggleGEXControls(0);
+        }, 100);
     }
 
     getDefaultConfig() {
@@ -225,6 +233,9 @@ class TradingDashboard {
         if (element.id === 'usePartialProfitTaking') {
             this.updatePartialProfitControls();
         }
+        
+        // 💾 Save parameters to localStorage
+        this.saveParametersToStorage();
     }
 
     updatePartialProfitControls() {
@@ -278,7 +289,13 @@ class TradingDashboard {
                 usePartialProfitTaking: true,
                 partialProfitLevel: 25,
                 moveStopToBreakeven: true,
-                reducedSignalSpacing: false
+                reducedSignalSpacing: false,
+                // 🛡️ CONSERVATIVE WEIGHTS (Total = 1.0) - Stability-focused
+                gexWeight: 0.0,      // DISABLED
+                avpWeight: 0.40,     // HIGH - Support/resistance focus
+                avwapWeight: 0.35,   // HIGH - Trend confirmation
+                fractalWeight: 0.15, // LOW - Less aggressive entries
+                atrWeight: 0.10      // STANDARD - Risk management
             },
             balanced: {
                 dailyPnLTarget: 200,
@@ -306,7 +323,13 @@ class TradingDashboard {
                 partialProfitLevel: 30,
                 partialProfitSize: 50,
                 moveStopToBreakeven: false,
-                reducedSignalSpacing: false
+                reducedSignalSpacing: false,
+                // Institutional weights (GEX disabled)
+                gexWeight: 0.0,
+                avpWeight: 0.25,
+                avwapWeight: 0.40,
+                fractalWeight: 0.25,
+                atrWeight: 0.10
             },
             sensitive: {
                 dailyPnLTarget: 150,
@@ -334,7 +357,13 @@ class TradingDashboard {
                 partialProfitLevel: 25,
                 partialProfitSize: 50,
                 moveStopToBreakeven: false,
-                reducedSignalSpacing: false
+                reducedSignalSpacing: false,
+                // ⚡ SENSITIVE WEIGHTS (Total = 1.0) - Signal-focused
+                gexWeight: 0.0,      // DISABLED
+                avpWeight: 0.20,     // LOWER - Less filtering
+                avwapWeight: 0.30,   // MEDIUM - Trend detection
+                fractalWeight: 0.35, // HIGH - More precise entries
+                atrWeight: 0.15      // HIGHER - More volatility awareness
             },
             aggressive: {
                 dailyPnLTarget: 400,
@@ -362,7 +391,13 @@ class TradingDashboard {
                 partialProfitLevel: 35,
                 partialProfitSize: 40,
                 moveStopToBreakeven: true,
-                reducedSignalSpacing: true
+                reducedSignalSpacing: true,
+                // 🚀 AGGRESSIVE WEIGHTS (Total = 1.0) - Opportunity-focused
+                gexWeight: 0.0,      // DISABLED
+                avpWeight: 0.15,     // LOW - Less conservative filtering
+                avwapWeight: 0.45,   // HIGHEST - Strong trend following
+                fractalWeight: 0.30, // HIGH - Aggressive entries
+                atrWeight: 0.10      // STANDARD - Risk management
             }
         };
 
@@ -384,6 +419,10 @@ class TradingDashboard {
             });
 
             this.updatePartialProfitControls();
+            
+            // 💾 Save preset parameters to localStorage
+            this.saveParametersToStorage();
+            
             this.addLog(`Loaded ${presetName.toUpperCase()} preset`, 'success');
         }
     }
@@ -416,15 +455,48 @@ class TradingDashboard {
             
             valueSpan.textContent = displayValue;
         }
+        
+        // Update current config and save to localStorage
+        this.currentConfig[input.id] = parseFloat(input.value);
+        this.saveParametersToStorage();
+        
+        // Hide/show GEX Controls based on GEX Weight
+        if (input.id === 'gexWeight') {
+            this.toggleGEXControls(parseFloat(input.value));
+        }
+    }
+    
+    toggleGEXControls(gexWeight) {
+        // Find all elements that contain "GEX Controls" text
+        const allH4s = document.querySelectorAll('h4');
+        let gexControlsPanel = null;
+        
+        allH4s.forEach(h4 => {
+            if (h4.textContent.includes('GEX Controls')) {
+                gexControlsPanel = h4.parentElement;
+            }
+        });
+        
+        if (gexControlsPanel) {
+            if (gexWeight === 0) {
+                gexControlsPanel.style.display = 'none';
+                console.log('🚫 GEX Controls hidden - GEX Weight is 0');
+                this.addLog('GEX Controls hidden (weight = 0)', 'info');
+            } else {
+                gexControlsPanel.style.display = 'block';
+                console.log('✅ GEX Controls shown - GEX Weight > 0');
+                this.addLog('GEX Controls shown (weight > 0)', 'info');
+            }
+        }
     }
 
     getAdvancedDefaults() {
         return {
-            // Component Weights
-            gexWeight: 0.30,
-            avpWeight: 0.20,
-            avwapWeight: 0.20,
-            fractalWeight: 0.20,
+            // Component Weights (GEX DISABLED)
+            gexWeight: 0.0,   // DISABLED - was causing bullish bias
+            avpWeight: 0.25,  // Increased
+            avwapWeight: 0.40, // MAJOR WEIGHT - trend following
+            fractalWeight: 0.25, // Increased
             atrWeight: 0.10,
             
             // Signal Thresholds
@@ -576,8 +648,8 @@ class TradingDashboard {
             }
         });
         
-        // Load balanced advanced preset by default
-        this.loadAdvancedPreset('balanced-adv');
+        // Load balanced preset by default (with GEX disabled)
+        this.loadPreset('balanced');
     }
 
     applyParameters() {
@@ -592,6 +664,26 @@ class TradingDashboard {
         } else {
             this.addLog('Not connected to trading engine', 'error');
         }
+    }
+
+    // 🔧 MISSING PRESET BUTTON HANDLERS - Add event listeners for preset buttons
+    initializePresetButtons() {
+        const presetButtons = document.querySelectorAll('.preset-btn');
+        presetButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const presetName = e.target.getAttribute('data-preset');
+                console.log(`🎯 Loading preset: ${presetName}`);
+                
+                // Update active button
+                presetButtons.forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // Load the preset with correct weights
+                this.loadPreset(presetName);
+                
+                this.addLog(`Loaded ${presetName} preset with optimized weights`, 'success');
+            });
+        });
     }
 
     handlePeriodChange(period) {
@@ -712,6 +804,7 @@ class TradingDashboard {
             'breakoutThresholdPct'
         ];
         
+        // Gather basic parameters
         Object.keys(this.currentConfig).forEach(key => {
             const element = document.getElementById(key);
             if (element) {
@@ -735,7 +828,131 @@ class TradingDashboard {
             }
         });
         
+        // 🏛️ ADD INSTITUTIONAL PARAMETERS FROM ADVANCED CONTROLS
+        const institutionalParams = [
+            'gexWeight', 'avpWeight', 'avwapWeight', 'fractalWeight', 'atrWeight',
+            'minimumBullishScore', 'minimumBearishScore', 'confluenceMinimumScore',
+            'gexConfidenceThreshold', 'atrPeriod', 'customStopMultiplier',
+            'positionSizeMultiplier', 'maxCorrelatedPositions', 'portfolioHeatThreshold',
+            'emergencyStopLoss'
+        ];
+        
+        institutionalParams.forEach(param => {
+            const element = document.getElementById(param);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    config[param] = element.checked;
+                } else if (element.type === 'range' || element.type === 'number') {
+                    config[param] = parseFloat(element.value);
+                } else {
+                    const value = element.value;
+                    config[param] = value === 'true' ? true : value === 'false' ? false : value;
+                }
+            }
+        });
+        
         return config;
+    }
+    
+    // 💾 PARAMETER PERSISTENCE METHODS
+    saveParametersToStorage() {
+        try {
+            const config = this.gatherCurrentConfig();
+            localStorage.setItem('dashboardTradingParameters', JSON.stringify(config));
+            console.log('💾 Parameters saved to localStorage');
+            
+            // Show brief visual confirmation
+            this.showSaveConfirmation();
+        } catch (error) {
+            console.error('❌ Failed to save parameters:', error);
+        }
+    }
+    
+    showSaveConfirmation() {
+        // Create or update save indicator
+        let indicator = document.getElementById('saveIndicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'saveIndicator';
+            indicator.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 255, 0, 0.8);
+                color: white;
+                padding: 8px 12px;
+                border-radius: 4px;
+                font-size: 12px;
+                z-index: 1000;
+                transition: opacity 0.3s;
+            `;
+            document.body.appendChild(indicator);
+        }
+        
+        indicator.textContent = '💾 Saved';
+        indicator.style.opacity = '1';
+        
+        // Fade out after 1 second
+        setTimeout(() => {
+            indicator.style.opacity = '0';
+        }, 1000);
+    }
+    
+    loadSavedParametersOrDefault() {
+        try {
+            // FORCE CLEAR old parameters to apply GEX fix
+            localStorage.removeItem('dashboardTradingParameters');
+            console.log('🔄 Cleared old parameters to apply GEX fix');
+            
+            console.log('💾 Loading balanced preset with GEX disabled');
+            this.loadPreset('balanced'); // Use balanced preset with GEX disabled
+            
+        } catch (error) {
+            console.error('❌ Failed to load saved parameters:', error);
+            this.loadPreset('balanced'); // Fallback to balanced preset
+        }
+    }
+    
+    applySavedParameters(config) {
+        // Apply saved configuration to UI elements
+        Object.keys(config).forEach(key => {
+            const element = document.getElementById(key);
+            if (element) {
+                if (element.type === 'checkbox') {
+                    element.checked = config[key];
+                } else if (element.type === 'number' || element.type === 'range') {
+                    // Convert decimal values back to percentages for display
+                    const percentageFields = [
+                        'initialStopLossPct', 'profitTargetPct', 'trailActivationPct', 
+                        'trailStopPct', 'maxRiskPerTradePct', 'maxDrawdownPct',
+                        'partialProfitLevel', 'partialProfitSize', 'momentumThresholdPct',
+                        'breakoutThresholdPct'
+                    ];
+                    
+                    if (percentageFields.includes(key) && config[key] < 1) {
+                        element.value = (config[key] * 100).toString();
+                    } else {
+                        element.value = config[key].toString();
+                    }
+                    
+                    // Update range slider displays
+                    const valueDisplay = document.getElementById(key + 'Value');
+                    if (valueDisplay) {
+                        valueDisplay.textContent = element.value;
+                    }
+                } else {
+                    element.value = config[key];
+                }
+                
+                // Update currentConfig
+                this.currentConfig[key] = config[key];
+            }
+        });
+        
+        // Update partial profit controls visibility
+        this.updatePartialProfitControls();
+        
+        console.log('✅ Saved parameters applied to dashboard');
     }
 
     sendMessage(message) {

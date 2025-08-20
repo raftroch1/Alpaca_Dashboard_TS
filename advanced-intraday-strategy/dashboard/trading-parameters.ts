@@ -62,6 +62,17 @@ export interface TradingParameters {
   enableGreeksMonitoring: boolean;  // true (real-time Greeks tracking)
   portfolioRiskLimit: number;       // 10.0 (10% max portfolio risk)
   dailyLossLimit: number;           // 500 (max daily loss limit)
+  
+  // 🎯 DirectIntegrationConfig Parameters (for paper trading)
+  gexWeight?: number;               // 0.30 (GEX component weight)
+  avpWeight?: number;               // 0.20 (AVP component weight)
+  avwapWeight?: number;             // 0.20 (AVWAP component weight)
+  fractalWeight?: number;           // 0.20 (Fractal component weight)
+  atrWeight?: number;               // 0.10 (ATR component weight)
+  minimumBullishScore?: number;     // 0.5 (minimum bullish confluence score)
+  minimumBearishScore?: number;     // 0.5 (minimum bearish confluence score)
+  riskMultiplier?: number;          // 1.0 (risk adjustment multiplier)
+  maxPositionSize?: number;         // 0.02 (max position size as % of account)
 }
 
 export interface TradingPreset {
@@ -123,7 +134,18 @@ export class ParameterPresets {
       minConfidenceLevel: 0.7, // Higher confidence for conservative
       enableGreeksMonitoring: true,
       portfolioRiskLimit: 5.0, // Lower risk for conservative
-      dailyLossLimit: 300
+      dailyLossLimit: 300,
+      
+      // 🛡️ CONSERVATIVE WEIGHTS (Total = 1.0) - Stability-focused
+      gexWeight: 0.0,      // DISABLED
+      avpWeight: 0.40,     // HIGH - Support/resistance focus
+      avwapWeight: 0.35,   // HIGH - Trend confirmation
+      fractalWeight: 0.15, // LOW - Less aggressive entries
+      atrWeight: 0.10,     // STANDARD - Risk management
+      minimumBullishScore: 0.6,  // Higher threshold for conservative
+      minimumBearishScore: 0.6,
+      riskMultiplier: 0.8,
+      maxPositionSize: 0.015
     }
   };
 
@@ -164,10 +186,10 @@ export class ParameterPresets {
       enableBreakoutSignals: true,
       enableTimeBasedSignals: true,
       
-      usePartialProfitTaking: false,
-      partialProfitLevel: 0.30,
-      partialProfitSize: 0.50,
-      moveStopToBreakeven: false,
+      usePartialProfitTaking: true,  // ✅ ENABLE PARTIAL PROFIT
+      partialProfitLevel: 0.30,      // Take partial at 30%
+      partialProfitSize: 0.50,       // Take 50% of position
+      moveStopToBreakeven: true,     // Move stop to breakeven after partial
       reducedSignalSpacing: false,
       
       // Institutional features - balanced settings
@@ -179,7 +201,18 @@ export class ParameterPresets {
       minConfidenceLevel: 0.6, // Standard confidence
       enableGreeksMonitoring: true,
       portfolioRiskLimit: 10.0, // Standard risk
-      dailyLossLimit: 500
+      dailyLossLimit: 500,
+      
+      // DirectIntegrationConfig parameters (GEX DISABLED FOR TREND FOLLOWING)
+      gexWeight: 0.0,   // DISABLED - was causing bullish bias
+      avpWeight: 0.25,  // Increased
+      avwapWeight: 0.40, // MAJOR WEIGHT - trend following  
+      fractalWeight: 0.25, // Increased
+      atrWeight: 0.10,
+      minimumBullishScore: 0.5,  // Relaxed from 0.7 (same as backtest)
+      minimumBearishScore: 0.5,
+      riskMultiplier: 1.0,
+      maxPositionSize: 0.02
     }
   };
 
@@ -235,7 +268,18 @@ export class ParameterPresets {
       minConfidenceLevel: 0.35, // Much lower confidence threshold
       enableGreeksMonitoring: true,
       portfolioRiskLimit: 8.0,
-      dailyLossLimit: 400
+      dailyLossLimit: 400,
+      
+      // ⚡ SENSITIVE WEIGHTS (Total = 1.0) - Signal-focused
+      gexWeight: 0.0,      // DISABLED
+      avpWeight: 0.20,     // LOWER - Less filtering
+      avwapWeight: 0.30,   // MEDIUM - Trend detection
+      fractalWeight: 0.35, // HIGH - More precise entries
+      atrWeight: 0.15,     // HIGHER - More volatility awareness
+      minimumBullishScore: 0.4,  // Lower for more signals
+      minimumBearishScore: 0.4,
+      riskMultiplier: 1.1,
+      maxPositionSize: 0.025
     }
   };
 
@@ -291,7 +335,18 @@ export class ParameterPresets {
       minConfidenceLevel: 0.5, // Lower confidence for more trades
       enableGreeksMonitoring: true,
       portfolioRiskLimit: 15.0, // Higher risk for aggressive
-      dailyLossLimit: 750
+      dailyLossLimit: 750,
+      
+      // 🚀 AGGRESSIVE WEIGHTS (Total = 1.0) - Opportunity-focused
+      gexWeight: 0.0,      // DISABLED
+      avpWeight: 0.15,     // LOW - Less conservative filtering
+      avwapWeight: 0.45,   // HIGHEST - Strong trend following
+      fractalWeight: 0.30, // HIGH - Aggressive entries
+      atrWeight: 0.10,     // STANDARD - Risk management
+      minimumBullishScore: 0.45,  // Lower for more opportunities
+      minimumBearishScore: 0.45,
+      riskMultiplier: 1.2,
+      maxPositionSize: 0.03
     }
   };
 

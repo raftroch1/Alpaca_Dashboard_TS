@@ -90,13 +90,13 @@ export class AnchoredVWAP {
   
   private static readonly DEFAULT_CONFIG: AVWAPConfiguration = {
     deviationThresholds: {
-      weak: 0.5,     // 0.5% deviation
-      moderate: 1.0, // 1.0% deviation
-      strong: 2.0    // 2.0% deviation
+      weak: 0.3,     // 0.3% deviation (more sensitive)
+      moderate: 0.8, // 0.8% deviation (more sensitive)
+      strong: 1.5    // 1.5% deviation (more sensitive)
     },
     volumeFilterEnabled: true,
     minimumVolumeRatio: 0.8, // 80% of average volume
-    slopeThreshold: 0.01,    // 1% slope change
+    slopeThreshold: 0.003,   // 0.3% slope change (MUCH more sensitive)
     confluenceFactors: {
       volumeWeight: 0.3,
       deviationWeight: 0.3,

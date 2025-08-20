@@ -269,25 +269,25 @@
                         <div class="advanced-panel">
                             <h4>🎯 Component Weights</h4>
                             <div class="compact-controls">
-                                <div class="control-row">
-                                    <label>GEX Weight</label>
-                                    <input type="range" id="gexWeight" min="0.1" max="0.5" step="0.05" value="0.30">
-                                    <span id="gexWeightValue">0.30</span>
+                                <div class="control-row" style="background: #ffeeee; opacity: 0.6; border-left: 3px solid #ff6666;">
+                                    <label style="color: #ff6666;">🚫 GEX Weight (DISABLED)</label>
+                                    <input type="range" id="gexWeight" min="0.0" max="0.5" step="0.05" value="0.0" style="opacity: 0.5;" disabled>
+                                    <span id="gexWeightValue" style="color: #ff6666; font-weight: bold;">0.0 (DISABLED)</span>
                                 </div>
                                 <div class="control-row">
                                     <label>AVP Weight</label>
-                                    <input type="range" id="avpWeight" min="0.1" max="0.3" step="0.05" value="0.20">
-                                    <span id="avpWeightValue">0.20</span>
+                                    <input type="range" id="avpWeight" min="0.1" max="0.4" step="0.05" value="0.25">
+                                    <span id="avpWeightValue">0.25</span>
                                 </div>
                                 <div class="control-row">
-                                    <label>AVWAP Weight</label>
-                                    <input type="range" id="avwapWeight" min="0.1" max="0.3" step="0.05" value="0.20">
-                                    <span id="avwapWeightValue">0.20</span>
+                                    <label>AVWAP Weight (Trend)</label>
+                                    <input type="range" id="avwapWeight" min="0.1" max="0.5" step="0.05" value="0.40">
+                                    <span id="avwapWeightValue">0.40</span>
                                 </div>
                                 <div class="control-row">
                                     <label>Fractal Weight</label>
-                                    <input type="range" id="fractalWeight" min="0.1" max="0.4" step="0.05" value="0.20">
-                                    <span id="fractalWeightValue">0.20</span>
+                                    <input type="range" id="fractalWeight" min="0.1" max="0.4" step="0.05" value="0.25">
+                                    <span id="fractalWeightValue">0.25</span>
                                 </div>
                                 <div class="control-row">
                                     <label>ATR Weight</label>
@@ -533,6 +533,6 @@
     </div>
 
     <!-- Scripts -->
-    <script src="assets/dashboard.js"></script>
+    <script src="assets/dashboard.js?v=20250820"></script>
 </body>
 </html>
