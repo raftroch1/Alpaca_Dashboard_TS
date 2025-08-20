@@ -1,30 +1,97 @@
 # 🎛️ Trading Strategy Dashboard
 
-## 🏛️ **INSTITUTIONAL-GRADE ENGINE** ⚠️
+## 🚨 **LATEST CRITICAL UPDATES (August 2025)** 
 
-**CRITICAL UPDATE: This dashboard now uses the REAL institutional-advanced-backtest.ts engine**
+### **🔧 RECENT CRITICAL FIXES IMPLEMENTED:**
 
-### **🚀 WHAT CHANGED:**
-- ❌ **DELETED**: `enhanced-hybrid-backtest.ts` (basic 0-DTE strategy) - **PERMANENTLY REMOVED TO AVOID CONFUSION**
-- ✅ **UPGRADED**: Now uses `institutional-advanced-backtest.ts` (full institutional suite)
-- ✅ **ALIGNED**: Paper trading uses same institutional signal logic as backtest
+#### **✅ ENHANCED LOG FORMAT (August 20, 2025)**
+- **Complete Trade History**: All trades logged (not just last 10)
+- **Detailed Timestamps**: Open time, close time, duration for every trade
+- **Enhanced Table Format**: Professional audit trail with full trade details
+- **Total Performance Metrics**: Shows complete backtest results, not just recent trades
 
-### **🏛️ INSTITUTIONAL FEATURES NOW ACTIVE:**
-- ✅ **GEX Analysis** (Gamma Exposure) - Real dealer positioning
-- ✅ **Volume Profile** (AVP) - Institutional support/resistance  
-- ✅ **Anchored VWAP** (AVWAP) - Professional trend analysis
-- ✅ **Microfractal-Fibonacci** - Precise institutional entries
-- ✅ **Coherent Strategy Framework** - Multi-indicator confluence
-- ✅ **Greeks Risk Management** - Delta, Gamma, Theta, Vega limits
-- ✅ **Transaction Costs** - Realistic slippage and commissions
-- ✅ **Signal Quality Filtering** - Minimum confidence thresholds
+#### **✅ MARKET HOURS VALIDATION (August 20, 2025)**
+- **Realistic Trading Hours**: Only 9:30 AM - 4:00 PM ET (matches Alpaca restrictions)
+- **Pre-market/After-hours Blocked**: Eliminates unrealistic extended-hours trades
+- **Accurate Trade Counts**: No more inflated performance from prohibited trading times
 
-### **🎯 PERFECT ALIGNMENT:**
-Both backtest AND paper trading now use the **exact same institutional signal generation**:
-- **Backtest**: `lib/BacktestEngine.runBacktest()` → `AdaptiveStrategySelector.generateAdaptiveSignal()`
-- **Paper Trading**: `AdaptiveStrategySelector.generateAdaptiveSignal()` (SAME METHOD)
-- **Parameters**: All dashboard settings affect both systems identically
-- **Features**: Greeks, Transaction Costs, Portfolio Risk Management, Spread Strategies
+#### **✅ AVWAP DIRECTION OVERRIDE (August 20, 2025)**
+- **Smart Directional Trading**: Strong bearish AVWAP (-0.5, <-0.3%) overrides positive scores
+- **Prevents Wrong-Direction Trades**: No more buying calls during strong downtrends
+- **Enhanced Market Respect**: System now properly follows market direction
+
+#### **✅ DIRECTIONAL BIAS FIXES (August 20, 2025)**
+- **Market Bias Detection**: Professional 5-component market internals analysis
+- **GEX Bullish Bias Eliminated**: GEX forced to 0.0 to prevent systematic bullish bias
+- **Balanced Signal Generation**: Now generates appropriate BUY_PUT and BUY_CALL signals
+
+## 🏛️ **INSTITUTIONAL-GRADE ENGINE** 
+
+**CURRENT STATUS: Uses DirectInstitutionalIntegration with advanced market bias detection**
+
+### **🚀 CURRENT ARCHITECTURE:**
+- ✅ **UPGRADED**: Uses `DirectInstitutionalIntegration` (institutional signal generation)
+- ✅ **ALIGNED**: Paper trading and backtest use identical logic
+- ✅ **ENHANCED**: Market bias detection with 5 professional internals
+
+### **🏛️ INSTITUTIONAL FEATURES ACTIVE:**
+- ✅ **GEX Analysis** (DISABLED - was causing bullish bias)
+- ✅ **Volume Profile** (AVP) - Institutional support/resistance (Weight: 0.25)
+- ✅ **Anchored VWAP** (AVWAP) - Professional trend analysis (Weight: 0.40 - MAJOR)
+- ✅ **Microfractal-Fibonacci** - Precise institutional entries (Weight: 0.25)
+- ✅ **Enhanced ATR** - Volatility-based risk management (Weight: 0.10)
+- ✅ **Market Bias Detection** - 5-component professional internals analysis
+- ✅ **AVWAP Direction Override** - Prevents wrong-direction trades
+
+### **🎯 PERFECT ALIGNMENT ACHIEVED:**
+Both backtest AND paper trading now use **identical institutional signal generation**:
+- **Backtest**: `DirectInstitutionalIntegration.generateDirectSignal()`
+- **Paper Trading**: `DirectInstitutionalIntegration.generateDirectSignal()` (SAME METHOD)
+- **Configuration**: Identical weights, thresholds, and parameters
+- **Market Hours**: Both respect 9:30 AM - 4:00 PM ET restrictions
+- **Logging**: Enhanced format with complete trade audit trail
+
+## 🎯 **CURRENT SYSTEM STATUS (August 2025)**
+
+### **🏛️ SIGNAL GENERATION ARCHITECTURE:**
+```typescript
+// Both backtest and paper trading use identical logic:
+DirectInstitutionalIntegration.generateDirectSignal(
+  marketData,           // Real-time market data
+  optionsChain,         // Realistic options with proper Greeks  
+  accountBalance,       // $25,000 account balance
+  institutionalConfig,  // AVWAP(0.40), AVP(0.25), Fractals(0.25), ATR(0.10), GEX(0.0-DISABLED)
+  dashboardParameters   // All dashboard controls affect both systems
+);
+```
+
+### **🚨 CRITICAL FIXES IMPLEMENTED:**
+
+#### **✅ AVWAP Direction Override (Prevents Wrong-Direction Trades):**
+```typescript
+if (avwapScore <= -0.5 && avwapDeviation < -0.3%) {
+  action = 'BUY_PUT';  // Strong bearish AVWAP overrides positive scores
+}
+```
+
+#### **✅ Market Hours Validation (Realistic Constraints):**
+```typescript
+if (!this.isMarketHours(currentBar.date)) {
+  continue; // Skip pre-market/after-hours (9:30 AM - 4:00 PM ET only)
+}
+```
+
+#### **✅ Enhanced Logging (Complete Audit Trail):**
+```
+#   | Action    | Strike | Entry  | Exit   | Open Time | Close Time | Duration | P&L     | %      | Result
+001 | BUY_PUT   | $  639 | $ 2.45 | $ 3.68 | 09:30:15  | 10:12:45   |   42min  | +245.00 | +50.2% | WIN ✅
+```
+
+### **📊 SYSTEM VALIDATION RESULTS:**
+- ✅ **Directional Trading Fixed**: Now generates BUY_PUT during downtrends
+- ✅ **Market Hours Enforced**: Realistic trade counts (no extended-hours phantom trades)
+- ✅ **Complete Logging**: Full audit trail with timestamps and duration
+- ✅ **Perfect Alignment**: Backtest and paper trading use identical logic
 
 ---
 
@@ -98,8 +165,8 @@ For complete troubleshooting guide, see: [Alpaca Market Data FAQ](https://docs.a
 
 ### 1. Launch Dashboard
 ```bash
-# From the advanced-intraday-strategy directory
-npx ts-node dashboard/launch-dashboard.ts
+# From the advanced-intraday-strategy/dashboard
+npx ts-node launch-dashboard.ts
 ```
 
 ### 2. Access Dashboard
