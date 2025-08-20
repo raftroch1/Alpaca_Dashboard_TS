@@ -112,17 +112,17 @@ export class DirectInstitutionalBacktestRunner {
         const currentData = marketData.slice(0, i + 1);
         
         try {
-          // Use SAME config as paper trading - GEX DISABLED for trend following
+          // Use EXACT SAME config as paper trading - ONLY GEX hardcoded to disabled
           const relaxedDirectConfig = {
-            gexWeight: 0.0,   // FORCE DISABLED - was causing bullish bias
-            avpWeight: 0.25,  // Increased
-            avwapWeight: 0.40, // MAJOR WEIGHT - trend following
-            fractalWeight: 0.25, // Increased
-            atrWeight: 0.10,
-            minimumBullishScore: 0.5,  // Relaxed from 0.7
-            minimumBearishScore: 0.5,
-            riskMultiplier: 1.0,
-            maxPositionSize: 0.02
+            gexWeight: 0.0,   // ✅ ONLY this hardcoded - FORCE DISABLED (was causing bullish bias)
+            avpWeight: parameters.avpWeight || 0.25,           // ✅ Use dashboard parameter
+            avwapWeight: parameters.avwapWeight || 0.40,       // ✅ Use dashboard parameter
+            fractalWeight: parameters.fractalWeight || 0.25,   // ✅ Use dashboard parameter
+            atrWeight: parameters.atrWeight || 0.10,           // ✅ Use dashboard parameter
+            minimumBullishScore: parameters.minimumBullishScore || 0.5,  // ✅ Use dashboard parameter
+            minimumBearishScore: parameters.minimumBearishScore || 0.5,  // ✅ Use dashboard parameter
+            riskMultiplier: parameters.riskMultiplier || 1.0,             // ✅ Use dashboard parameter
+            maxPositionSize: parameters.maxPositionSize || 0.02           // ✅ Use dashboard parameter
           };
           
           const signal = await DirectInstitutionalIntegration.generateDirectSignal(
