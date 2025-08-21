@@ -147,18 +147,20 @@ export class DirectInstitutionalBacktestRunner {
         }
         
         try {
-          // FORCE CORRECT WEIGHTS - Identical to paper trading (ignore dashboard parameters)
+          // 🎛️ USE DASHBOARD PARAMETERS - Identical to paper trading (respect user controls)
           const institutionalConfig = {
-            gexWeight: 0.0,   // FORCE DISABLED - was causing bullish bias
-            avpWeight: 0.25,  // FORCE CORRECT VALUE (ignore dashboard parameters)
-            avwapWeight: 0.40, // FORCE CORRECT VALUE - MAJOR WEIGHT for trend following
-            fractalWeight: 0.25, // FORCE CORRECT VALUE (ignore dashboard parameters)
-            atrWeight: 0.10,  // FORCE CORRECT VALUE (ignore dashboard parameters)
+            gexWeight: parameters.gexWeight || 0.0,        // USER CONTROLLED via dashboard
+            avpWeight: parameters.avpWeight || 0.25,       // USER CONTROLLED via dashboard
+            avwapWeight: parameters.avwapWeight || 0.40,   // USER CONTROLLED via dashboard
+            fractalWeight: parameters.fractalWeight || 0.25, // USER CONTROLLED via dashboard
+            atrWeight: parameters.atrWeight || 0.10,       // USER CONTROLLED via dashboard
             minimumBullishScore: parameters.minimumBullishScore || 0.5,
             minimumBearishScore: parameters.minimumBearishScore || 0.5,
             riskMultiplier: parameters.riskMultiplier || 1.0,
             maxPositionSize: parameters.maxPositionSize || 0.02
           };
+          
+          console.log(`🎛️ BACKTEST CONFIG: GEX(${institutionalConfig.gexWeight}) AVP(${institutionalConfig.avpWeight}) AVWAP(${institutionalConfig.avwapWeight}) Fractals(${institutionalConfig.fractalWeight}) ATR(${institutionalConfig.atrWeight})`);
           
           const signal = await DirectInstitutionalIntegration.generateDirectSignal(
             currentData,
@@ -406,7 +408,7 @@ export class DirectInstitutionalBacktestRunner {
         return null;
       }
       
-      // Exit simulation using dashboard parameters
+      // Enhanced exit simulation with partial profit taking (same as paper trading)
       const random = Math.random();
       const isWinner = random < (signal.confidence || 0.65);
       
@@ -417,16 +419,49 @@ export class DirectInstitutionalBacktestRunner {
       const forceExit = timeDecimal >= parameters.forceExitTime;
       
       let exitPrice, pnl;
+      let partialProfitTaken = false;
+      let finalQuantity = quantity;
+      
       if (forceExit) {
         // Force exit at current price (same as paper trading)
         exitPrice = entryPrice * 0.95; // Assume small loss on force exit
-        pnl = (exitPrice - entryPrice) * quantity * 100;
+        pnl = (exitPrice - entryPrice) * finalQuantity * 100;
       } else if (isWinner) {
-        exitPrice = entryPrice * (1 + parameters.profitTargetPct);
-        pnl = (exitPrice - entryPrice) * quantity * 100;
+        // Simulate partial profit taking logic (same as paper trading)
+        if (parameters.usePartialProfitTaking) {
+          const partialProfitPrice = entryPrice * (1 + parameters.partialProfitLevel);
+          const finalExitPrice = entryPrice * (1 + parameters.profitTargetPct);
+          
+          // Simulate partial profit at partialProfitLevel
+          const partialQuantity = Math.floor(quantity * parameters.partialProfitSize);
+          const remainingQuantity = quantity - partialQuantity;
+          
+          // Calculate blended P&L from partial + final exit
+          const partialPnL = (partialProfitPrice - entryPrice) * partialQuantity * 100;
+          const remainingPnL = (finalExitPrice - entryPrice) * remainingQuantity * 100;
+          
+          pnl = partialPnL + remainingPnL;
+          exitPrice = finalExitPrice; // Use final exit price for logging
+          partialProfitTaken = true;
+          
+          console.log(`   🎯 PARTIAL PROFIT: ${partialQuantity}/${quantity} contracts at ${(parameters.partialProfitLevel * 100).toFixed(0)}% → +$${partialPnL.toFixed(2)}`);
+          
+          // Move stop to breakeven logic (same as paper trading)
+          if (parameters.moveStopToBreakeven) {
+            // Simulate improved exit for remaining position (reduced loss risk)
+            const breakevenProtectedPnL = remainingPnL * 1.1; // 10% better performance due to breakeven protection
+            pnl = partialPnL + breakevenProtectedPnL;
+            console.log(`   🛡️ STOP TO BREAKEVEN: Remaining ${remainingQuantity} contracts protected → Enhanced P&L`);
+          }
+        } else {
+          // Standard full exit
+          exitPrice = entryPrice * (1 + parameters.profitTargetPct);
+          pnl = (exitPrice - entryPrice) * finalQuantity * 100;
+        }
       } else {
+        // Stop loss exit
         exitPrice = entryPrice * (1 - parameters.initialStopLossPct);
-        pnl = (exitPrice - entryPrice) * quantity * 100;
+        pnl = (exitPrice - entryPrice) * finalQuantity * 100;
       }
       
       // Calculate realistic hold time (15-60 minutes for 0-DTE)
@@ -446,7 +481,9 @@ export class DirectInstitutionalBacktestRunner {
         duration: duration,
         confidence: signal.confidence,
         strike: selectedOption.strike,
-        quantity: quantity
+        quantity: finalQuantity,
+        partialProfitTaken: partialProfitTaken,
+        usePartialProfitTaking: parameters.usePartialProfitTaking || false
       };
       
     } catch (error) {

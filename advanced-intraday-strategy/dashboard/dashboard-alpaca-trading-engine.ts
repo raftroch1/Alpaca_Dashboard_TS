@@ -503,18 +503,20 @@ export class DashboardAlpacaTradingEngine {
       // 🚀 USE EXACT SAME METHOD AS BACKTEST - DirectInstitutionalIntegration
       const { DirectInstitutionalIntegration } = await import('../../clean-strategy/core/institutional-strategy/direct-institutional-integration');
       
-      // FORCE CORRECT WEIGHTS - Override dashboard parameters to ensure consistency
+      // 🎛️ USE DASHBOARD PARAMETERS - Respect user GEX controls
       const institutionalConfig = {
-        gexWeight: 0.0,   // FORCE DISABLED - was causing bullish bias
-        avpWeight: 0.25,  // FORCE CORRECT VALUE (ignore dashboard parameters)
-        avwapWeight: 0.40, // FORCE CORRECT VALUE - MAJOR WEIGHT for trend following
-        fractalWeight: 0.25, // FORCE CORRECT VALUE (ignore dashboard parameters)
-        atrWeight: 0.10,  // FORCE CORRECT VALUE (ignore dashboard parameters)
+        gexWeight: this.parameters.gexWeight || 0.0,        // USER CONTROLLED via dashboard
+        avpWeight: this.parameters.avpWeight || 0.25,       // USER CONTROLLED via dashboard
+        avwapWeight: this.parameters.avwapWeight || 0.40,   // USER CONTROLLED via dashboard
+        fractalWeight: this.parameters.fractalWeight || 0.25, // USER CONTROLLED via dashboard
+        atrWeight: this.parameters.atrWeight || 0.10,       // USER CONTROLLED via dashboard
         minimumBullishScore: this.parameters.minimumBullishScore || 0.5,
         minimumBearishScore: this.parameters.minimumBearishScore || 0.5,
         riskMultiplier: this.parameters.riskMultiplier || 1.0,
         maxPositionSize: this.parameters.maxPositionSize || 0.02
       };
+      
+      console.log(`🎛️ PAPER TRADING CONFIG: GEX(${institutionalConfig.gexWeight}) AVP(${institutionalConfig.avpWeight}) AVWAP(${institutionalConfig.avwapWeight}) Fractals(${institutionalConfig.fractalWeight}) ATR(${institutionalConfig.atrWeight})`);
       
       const signal = await DirectInstitutionalIntegration.generateDirectSignal(
         marketData,
@@ -529,7 +531,8 @@ export class DashboardAlpacaTradingEngine {
         console.log(`🏛️ PAPER TRADING - INSTITUTIONAL SIGNAL: ${signal.action}`);
         console.log(`📊 Confidence: ${(signal.confidence * 100).toFixed(1)}% (SAME AS BACKTEST)`);
         console.log(`🔍 Reasoning: ${signal.reasoning}`);
-        console.log(`🎯 Using: GEX(0.0-DISABLED), AVP(${institutionalConfig.avpWeight}), AVWAP(${institutionalConfig.avwapWeight}), Fractals(${institutionalConfig.fractalWeight}), ATR(${institutionalConfig.atrWeight})`);
+        const gexStatus = institutionalConfig.gexWeight > 0 ? `${institutionalConfig.gexWeight}-ENABLED` : '0.0-DISABLED';
+        console.log(`🎯 Using: GEX(${gexStatus}), AVP(${institutionalConfig.avpWeight}), AVWAP(${institutionalConfig.avwapWeight}), Fractals(${institutionalConfig.fractalWeight}), ATR(${institutionalConfig.atrWeight})`);
         
         // Map our DirectInstitutional signals to dashboard format
         let dashboardAction: 'BUY_CALL' | 'BUY_PUT' | 'NO_TRADE';
@@ -1072,7 +1075,8 @@ export class DashboardAlpacaTradingEngine {
     console.log(`   💰 P&L: $${totalPnL.toFixed(2)} (Target: $${this.parameters.dailyPnLTarget})`);
     console.log(`   📈 Active Positions: ${this.activeTrades.length}/${this.parameters.maxConcurrentPositions}`);
     console.log(`   🎯 Win Rate: ${(winRate * 100).toFixed(1)}% (Backtest: 50.9%)`);
-    console.log(`   🏛️ Features: GEX(0.0-DISABLED), AVP(${this.parameters.avpWeight || 0.25}), AVWAP(${this.parameters.avwapWeight || 0.40}), Fractals(${this.parameters.fractalWeight || 0.25})`);
+    const gexFeatureStatus = (this.parameters.gexWeight || 0) > 0 ? `${this.parameters.gexWeight}-ENABLED` : '0.0-DISABLED';
+    console.log(`   🏛️ Features: GEX(${gexFeatureStatus}), AVP(${this.parameters.avpWeight || 0.25}), AVWAP(${this.parameters.avwapWeight || 0.40}), Fractals(${this.parameters.fractalWeight || 0.25})`);
   }
 
 

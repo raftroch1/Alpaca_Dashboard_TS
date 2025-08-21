@@ -296,7 +296,7 @@ class TradingDashboard {
                 moveStopToBreakeven: true,
                 reducedSignalSpacing: false,
                 // 🛡️ CONSERVATIVE WEIGHTS (Total = 1.0) - Stability-focused
-                gexWeight: 0.0,      // DISABLED
+                // Note: GEX weight controlled by user toggle, not preset
                 avpWeight: 0.40,     // HIGH - Support/resistance focus
                 avwapWeight: 0.35,   // HIGH - Trend confirmation
                 fractalWeight: 0.15, // LOW - Less aggressive entries
@@ -329,8 +329,8 @@ class TradingDashboard {
                 partialProfitSize: 50,
                 moveStopToBreakeven: false,
                 reducedSignalSpacing: false,
-                // Institutional weights (GEX disabled)
-                gexWeight: 0.0,
+                // Institutional weights (GEX controlled by user toggle)
+                // Note: GEX weight controlled by user toggle, not preset
                 avpWeight: 0.25,
                 avwapWeight: 0.40,
                 fractalWeight: 0.25,
@@ -364,7 +364,7 @@ class TradingDashboard {
                 moveStopToBreakeven: false,
                 reducedSignalSpacing: false,
                 // ⚡ SENSITIVE WEIGHTS (Total = 1.0) - Signal-focused
-                gexWeight: 0.0,      // DISABLED
+                // Note: GEX weight controlled by user toggle, not preset
                 avpWeight: 0.20,     // LOWER - Less filtering
                 avwapWeight: 0.30,   // MEDIUM - Trend detection
                 fractalWeight: 0.35, // HIGH - More precise entries
@@ -398,7 +398,7 @@ class TradingDashboard {
                 moveStopToBreakeven: true,
                 reducedSignalSpacing: true,
                 // 🚀 AGGRESSIVE WEIGHTS (Total = 1.0) - Opportunity-focused
-                gexWeight: 0.0,      // DISABLED
+                // Note: GEX weight controlled by user toggle, not preset
                 avpWeight: 0.15,     // LOW - Less conservative filtering
                 avwapWeight: 0.45,   // HIGHEST - Strong trend following
                 fractalWeight: 0.30, // HIGH - Aggressive entries
@@ -557,8 +557,8 @@ class TradingDashboard {
 
     getAdvancedDefaults() {
         return {
-            // Component Weights (GEX DISABLED)
-            gexWeight: 0.0,   // DISABLED - was causing bullish bias
+            // Component Weights (GEX controlled by user toggle)
+            // Note: GEX weight controlled by user toggle, not defaults
             avpWeight: 0.25,  // Increased
             avwapWeight: 0.40, // MAJOR WEIGHT - trend following
             fractalWeight: 0.25, // Increased
@@ -590,7 +590,7 @@ class TradingDashboard {
     loadAdvancedPreset(presetName) {
         const presets = {
             'conservative-adv': {
-                gexWeight: 0.0,      // DISABLED - was causing bullish bias
+                // Note: GEX weight controlled by user toggle, not preset
                 avpWeight: 0.40,     // HIGH - Support/resistance focus
                 avwapWeight: 0.35,   // HIGH - Trend confirmation
                 fractalWeight: 0.15, // LOW - Less aggressive entries
@@ -610,7 +610,7 @@ class TradingDashboard {
                 dynamicThresholds: false
             },
             'balanced-adv': {
-                gexWeight: 0.0,      // DISABLED - was causing bullish bias
+                // Note: GEX weight controlled by user toggle, not preset
                 avpWeight: 0.25,     // Increased
                 avwapWeight: 0.40,   // MAJOR WEIGHT - trend following
                 fractalWeight: 0.25, // Increased
@@ -630,7 +630,7 @@ class TradingDashboard {
                 dynamicThresholds: false
             },
             'sensitive-adv': {
-                gexWeight: 0.0,      // DISABLED - was causing bullish bias
+                // Note: GEX weight controlled by user toggle, not preset
                 avpWeight: 0.20,     // LOWER - Less filtering
                 avwapWeight: 0.30,   // MEDIUM - Trend detection
                 fractalWeight: 0.35, // HIGH - More precise entries
@@ -650,7 +650,7 @@ class TradingDashboard {
                 dynamicThresholds: false
             },
             'aggressive-adv': {
-                gexWeight: 0.0,      // DISABLED - was causing bullish bias
+                // Note: GEX weight controlled by user toggle, not preset
                 avpWeight: 0.15,     // LOW - Less conservative filtering
                 avwapWeight: 0.45,   // HIGHEST - Strong trend following
                 fractalWeight: 0.30, // HIGH - Aggressive entries
@@ -895,7 +895,7 @@ class TradingDashboard {
         
         // 🏛️ ADD INSTITUTIONAL PARAMETERS FROM ADVANCED CONTROLS
         const institutionalParams = [
-            'gexWeight', 'avpWeight', 'avwapWeight', 'fractalWeight', 'atrWeight',
+            'enableGEX', 'gexWeight', 'avpWeight', 'avwapWeight', 'fractalWeight', 'atrWeight',
             'minimumBullishScore', 'minimumBearishScore', 'confluenceMinimumScore',
             'gexConfidenceThreshold', 'atrPeriod', 'customStopMultiplier',
             'positionSizeMultiplier', 'maxCorrelatedPositions', 'portfolioHeatThreshold',
