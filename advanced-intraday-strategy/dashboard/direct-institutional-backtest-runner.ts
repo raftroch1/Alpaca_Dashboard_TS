@@ -106,6 +106,8 @@ export class DirectInstitutionalBacktestRunner {
       let winningTrades = 0;
       let totalWins = 0;
       let totalLosses = 0;
+      let dailyTradesGenerated = 0;
+      let lastSignalTime = 0;
       
       // Simulate trading over the period
       for (let i = 50; i < marketData.length; i += 10) { // Every 10 bars
@@ -117,25 +119,53 @@ export class DirectInstitutionalBacktestRunner {
           continue; // Skip this bar - outside market hours (matches Alpaca restrictions)
         }
         
+        // 📊 DAILY TRADE LIMIT CHECK (same as paper trading)
+        if (parameters.dailyTradeTarget && dailyTradesGenerated >= parameters.dailyTradeTarget) {
+          continue; // Skip if daily trade limit reached
+        }
+        
+        // ⏰ SIGNAL SPACING CHECK (same as paper trading)
+        const currentTimeMs = currentBar.date.getTime();
+        const minutesSinceLastSignal = (currentTimeMs - lastSignalTime) / (1000 * 60);
+        const requiredSpacing = parameters.reducedSignalSpacing ? 
+          parameters.minSignalSpacingMinutes / 2 : 
+          parameters.minSignalSpacingMinutes;
+          
+        if (minutesSinceLastSignal < requiredSpacing && lastSignalTime > 0) {
+          continue; // Skip if signal spacing not met
+        }
+        
+        // 📊 MAX CONCURRENT POSITIONS CHECK (same as paper trading)
+        // For backtest simulation, assume average hold time of 30 minutes
+        const recentTrades = trades.filter(t => {
+          const timeDiff = (currentTimeMs - t.entryTime.getTime()) / (1000 * 60);
+          return timeDiff < 30; // Assume positions held for 30 minutes average
+        });
+        
+        if (recentTrades.length >= parameters.maxConcurrentPositions) {
+          continue; // Skip if too many concurrent positions
+        }
+        
         try {
-          // Use our proven DirectInstitutionalIntegration with relaxed config for real data
-          const relaxedDirectConfig = {
-            gexWeight: 0.30,
-            avpWeight: 0.20,
-            avwapWeight: 0.20,
-            fractalWeight: 0.20,
-            atrWeight: 0.10,
-            minimumBullishScore: 0.5,  // Relaxed from 0.7
-            minimumBearishScore: 0.5,
-            riskMultiplier: 1.0,
-            maxPositionSize: 0.02
+          // FORCE CORRECT WEIGHTS - Identical to paper trading (ignore dashboard parameters)
+          const institutionalConfig = {
+            gexWeight: 0.0,   // FORCE DISABLED - was causing bullish bias
+            avpWeight: 0.25,  // FORCE CORRECT VALUE (ignore dashboard parameters)
+            avwapWeight: 0.40, // FORCE CORRECT VALUE - MAJOR WEIGHT for trend following
+            fractalWeight: 0.25, // FORCE CORRECT VALUE (ignore dashboard parameters)
+            atrWeight: 0.10,  // FORCE CORRECT VALUE (ignore dashboard parameters)
+            minimumBullishScore: parameters.minimumBullishScore || 0.5,
+            minimumBearishScore: parameters.minimumBearishScore || 0.5,
+            riskMultiplier: parameters.riskMultiplier || 1.0,
+            maxPositionSize: parameters.maxPositionSize || 0.02
           };
           
           const signal = await DirectInstitutionalIntegration.generateDirectSignal(
             currentData,
             optionsChain,
             25000,  // Account balance
-            relaxedDirectConfig  // Use relaxed thresholds (0.5 vs 0.7 confluence)
+            institutionalConfig,  // Same config as paper trading, read from dashboard
+            parameters  // ✅ PASS ALL DASHBOARD PARAMETERS (same as paper trading)
           );
           
           if (signal && signal.action !== 'NO_TRADE') {
@@ -143,21 +173,25 @@ export class DirectInstitutionalBacktestRunner {
             // Simulate trade execution
             const trade = await this.executeRealOnlyTrade(signal, parameters, currentBar);
             if (trade) {
-            trades.push(trade);
+              trades.push(trade);
+              
+              // Update counters (same as paper trading)
+              dailyTradesGenerated++;
+              lastSignalTime = currentTimeMs;
+              
+              totalPnL += trade.pnl;
+              if (trade.pnl > 0) {
+                winningTrades++;
+                totalWins += trade.pnl;
+              } else {
+                totalLosses += Math.abs(trade.pnl);
+              }
+              
+              // Track signal types (simplified)
+              signalBreakdown.gexSignals++;
+              
+              console.log(`📊 Trade ${trades.length}: ${signal.action} → P&L: ${trade.pnl >= 0 ? '+' : ''}$${trade.pnl.toFixed(2)}`);
             }
-            
-            totalPnL += trade.pnl;
-            if (trade.pnl > 0) {
-              winningTrades++;
-              totalWins += trade.pnl;
-            } else {
-              totalLosses += Math.abs(trade.pnl);
-            }
-            
-            // Track signal types (simplified)
-            signalBreakdown.gexSignals++;
-            
-            console.log(`📊 Trade ${trades.length}: ${signal.action} → P&L: ${trade.pnl >= 0 ? '+' : ''}$${trade.pnl.toFixed(2)}`);
           }
           
         } catch (error) {
@@ -373,14 +407,24 @@ export class DirectInstitutionalBacktestRunner {
       }
       
       // Exit simulation using dashboard parameters
-    const random = Math.random();
+      const random = Math.random();
       const isWinner = random < (signal.confidence || 0.65);
       
+      // Check force exit time (same as paper trading)
+      const hour = currentBar.date.getHours();
+      const minute = currentBar.date.getMinutes();
+      const timeDecimal = hour + minute / 60;
+      const forceExit = timeDecimal >= parameters.forceExitTime;
+      
       let exitPrice, pnl;
-    if (isWinner) {
+      if (forceExit) {
+        // Force exit at current price (same as paper trading)
+        exitPrice = entryPrice * 0.95; // Assume small loss on force exit
+        pnl = (exitPrice - entryPrice) * quantity * 100;
+      } else if (isWinner) {
         exitPrice = entryPrice * (1 + parameters.profitTargetPct);
         pnl = (exitPrice - entryPrice) * quantity * 100;
-    } else {
+      } else {
         exitPrice = entryPrice * (1 - parameters.initialStopLossPct);
         pnl = (exitPrice - entryPrice) * quantity * 100;
       }

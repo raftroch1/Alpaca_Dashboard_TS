@@ -525,11 +525,11 @@ class TradingDashboard {
     loadAdvancedPreset(presetName) {
         const presets = {
             'conservative-adv': {
-                gexWeight: 0.25,
-                avpWeight: 0.25,
-                avwapWeight: 0.25,
-                fractalWeight: 0.15,
-                atrWeight: 0.10,
+                gexWeight: 0.0,      // DISABLED - was causing bullish bias
+                avpWeight: 0.40,     // HIGH - Support/resistance focus
+                avwapWeight: 0.35,   // HIGH - Trend confirmation
+                fractalWeight: 0.15, // LOW - Less aggressive entries
+                atrWeight: 0.10,     // STANDARD - Risk management
                 minimumBullishScore: 0.70,
                 minimumBearishScore: 0.70,
                 confluenceMinimumScore: 0.7,
@@ -545,11 +545,11 @@ class TradingDashboard {
                 dynamicThresholds: false
             },
             'balanced-adv': {
-                gexWeight: 0.30,
-                avpWeight: 0.20,
-                avwapWeight: 0.20,
-                fractalWeight: 0.20,
-                atrWeight: 0.10,
+                gexWeight: 0.0,      // DISABLED - was causing bullish bias
+                avpWeight: 0.25,     // Increased
+                avwapWeight: 0.40,   // MAJOR WEIGHT - trend following
+                fractalWeight: 0.25, // Increased
+                atrWeight: 0.10,     // STANDARD
                 minimumBullishScore: 0.60,
                 minimumBearishScore: 0.60,
                 confluenceMinimumScore: 0.6,
@@ -565,11 +565,11 @@ class TradingDashboard {
                 dynamicThresholds: false
             },
             'sensitive-adv': {
-                gexWeight: 0.30,
-                avpWeight: 0.20,
-                avwapWeight: 0.20,
-                fractalWeight: 0.20,
-                atrWeight: 0.10,
+                gexWeight: 0.0,      // DISABLED - was causing bullish bias
+                avpWeight: 0.20,     // LOWER - Less filtering
+                avwapWeight: 0.30,   // MEDIUM - Trend detection
+                fractalWeight: 0.35, // HIGH - More precise entries
+                atrWeight: 0.15,     // HIGHER - More volatility awareness
                 minimumBullishScore: 0.35,
                 minimumBearishScore: 0.35,
                 confluenceMinimumScore: 0.35,
@@ -585,11 +585,11 @@ class TradingDashboard {
                 dynamicThresholds: false
             },
             'aggressive-adv': {
-                gexWeight: 0.35,
-                avpWeight: 0.15,
-                avwapWeight: 0.15,
-                fractalWeight: 0.25,
-                atrWeight: 0.10,
+                gexWeight: 0.0,      // DISABLED - was causing bullish bias
+                avpWeight: 0.15,     // LOW - Less conservative filtering
+                avwapWeight: 0.45,   // HIGHEST - Strong trend following
+                fractalWeight: 0.30, // HIGH - Aggressive entries
+                atrWeight: 0.10,     // STANDARD - Risk management
                 minimumBullishScore: 0.50,
                 minimumBearishScore: 0.50,
                 confluenceMinimumScore: 0.5,

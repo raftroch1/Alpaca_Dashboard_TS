@@ -254,18 +254,18 @@ export class DirectInstitutionalIntegration {
       // 🚨 CRITICAL FIX: Check AVWAP direction first when it's strongly bearish/bullish
       const avwapDeviation = avwapAnalysis ? ((currentPrice - (avwapAnalysis as any).currentAVWAP) / (avwapAnalysis as any).currentAVWAP) * 100 : 0;
       
-      if (avwapScore <= -0.5 && avwapDeviation < -0.3) {
-        // Strong bearish AVWAP overrides positive institutional scores
+      if (avwapScore <= -0.3 && avwapDeviation < -0.2) {
+        // Bearish AVWAP overrides positive institutional scores (RELAXED THRESHOLDS)
         action = 'BUY_PUT';
         finalScore = Math.abs(avwapScore);
-        reasoning = `Strong AVWAP bearish signal overrides institutional confluence (AVWAP: ${avwapDeviation.toFixed(2)}%)`;
-        console.log(`🔴 TIER 2 - AVWAP OVERRIDE: Strong bearish AVWAP → BUY_PUT`);
-      } else if (avwapScore >= 0.5 && avwapDeviation > 0.3) {
-        // Strong bullish AVWAP overrides negative institutional scores
+        reasoning = `Bearish AVWAP signal overrides institutional confluence (AVWAP: ${avwapDeviation.toFixed(2)}%)`;
+        console.log(`🔴 TIER 2 - AVWAP OVERRIDE: Bearish AVWAP → BUY_PUT`);
+      } else if (avwapScore >= 0.3 && avwapDeviation > 0.2) {
+        // Bullish AVWAP overrides negative institutional scores (RELAXED THRESHOLDS)
         action = 'BUY_CALL';
         finalScore = avwapScore;
-        reasoning = `Strong AVWAP bullish signal overrides institutional confluence (AVWAP: +${avwapDeviation.toFixed(2)}%)`;
-        console.log(`🟢 TIER 2 - AVWAP OVERRIDE: Strong bullish AVWAP → BUY_CALL`);
+        reasoning = `Bullish AVWAP signal overrides institutional confluence (AVWAP: +${avwapDeviation.toFixed(2)}%)`;
+        console.log(`🟢 TIER 2 - AVWAP OVERRIDE: Bullish AVWAP → BUY_CALL`);
       } else if (totalScore > 0.2) {
         action = 'BUY_CALL';
         finalScore = institutionalStrength;
@@ -495,7 +495,26 @@ export class DirectInstitutionalIntegration {
     
     // More fractals = more confluence opportunities
     const fractalCount = fractals.confirmedFractals.length;
-    return Math.min(0.8, fractalCount * 0.1);
+    const baseScore = Math.min(0.8, fractalCount * 0.1);
+    
+    // 🚨 CRITICAL FIX: Make fractal score directional based on market structure
+    switch (fractals.marketStructure) {
+      case 'TRENDING_DOWN':
+        console.log(`   🔴 FRACTAL DIRECTIONAL: TRENDING_DOWN → Negative score (-${baseScore.toFixed(2)})`);
+        return -baseScore; // Negative for bearish market structure
+      case 'TRENDING_UP':
+        console.log(`   🟢 FRACTAL DIRECTIONAL: TRENDING_UP → Positive score (+${baseScore.toFixed(2)})`);
+        return baseScore;  // Positive for bullish market structure
+      case 'RANGE_BOUND':
+        console.log(`   ⚪ FRACTAL DIRECTIONAL: RANGE_BOUND → Neutral score (${(baseScore * 0.3).toFixed(2)})`);
+        return baseScore * 0.3; // Reduced influence in ranging markets
+      case 'BREAKOUT':
+        console.log(`   🟡 FRACTAL DIRECTIONAL: BREAKOUT → Moderate score (${(baseScore * 0.6).toFixed(2)})`);
+        return baseScore * 0.6; // Moderate influence during breakouts
+      default:
+        console.log(`   ⚪ FRACTAL DIRECTIONAL: UNKNOWN → Neutral score (${(baseScore * 0.5).toFixed(2)})`);
+        return baseScore * 0.5; // Default neutral influence
+    }
   }
   
   private static scoreATR(atr: ATRSnapshot): number {

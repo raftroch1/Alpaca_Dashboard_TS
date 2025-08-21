@@ -503,13 +503,13 @@ export class DashboardAlpacaTradingEngine {
       // 🚀 USE EXACT SAME METHOD AS BACKTEST - DirectInstitutionalIntegration
       const { DirectInstitutionalIntegration } = await import('../../clean-strategy/core/institutional-strategy/direct-institutional-integration');
       
-      // Use EXACT SAME config as backtest - GEX DISABLED for trend following
+      // FORCE CORRECT WEIGHTS - Override dashboard parameters to ensure consistency
       const institutionalConfig = {
         gexWeight: 0.0,   // FORCE DISABLED - was causing bullish bias
-        avpWeight: this.parameters.avpWeight || 0.25,
-        avwapWeight: this.parameters.avwapWeight || 0.40,  // MAJOR WEIGHT - trend following
-        fractalWeight: this.parameters.fractalWeight || 0.25,
-        atrWeight: this.parameters.atrWeight || 0.10,
+        avpWeight: 0.25,  // FORCE CORRECT VALUE (ignore dashboard parameters)
+        avwapWeight: 0.40, // FORCE CORRECT VALUE - MAJOR WEIGHT for trend following
+        fractalWeight: 0.25, // FORCE CORRECT VALUE (ignore dashboard parameters)
+        atrWeight: 0.10,  // FORCE CORRECT VALUE (ignore dashboard parameters)
         minimumBullishScore: this.parameters.minimumBullishScore || 0.5,
         minimumBearishScore: this.parameters.minimumBearishScore || 0.5,
         riskMultiplier: this.parameters.riskMultiplier || 1.0,
