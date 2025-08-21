@@ -119,6 +119,14 @@ export class DirectInstitutionalBacktestRunner {
           continue; // Skip this bar - outside market hours (matches Alpaca restrictions)
         }
         
+        // ⏰ FORCE EXIT TIME CHECK - No new trades after cutoff (same as paper trading)
+        const hour = currentBar.date.getHours();
+        const minute = currentBar.date.getMinutes();
+        const timeDecimal = hour + minute / 60;
+        if (timeDecimal >= parameters.forceExitTime) {
+          continue; // Skip new trades after force exit time (matches paper trading)
+        }
+        
         // 📊 DAILY TRADE LIMIT CHECK (same as paper trading)
         if (parameters.dailyTradeTarget && dailyTradesGenerated >= parameters.dailyTradeTarget) {
           continue; // Skip if daily trade limit reached
