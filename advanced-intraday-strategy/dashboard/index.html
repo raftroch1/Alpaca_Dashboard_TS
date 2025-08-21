@@ -269,8 +269,17 @@
                         <div class="advanced-panel">
                             <h4>🎯 Component Weights</h4>
                             <div class="compact-controls">
-                                <div class="control-row" style="background: #ffeeee; opacity: 0.6; border-left: 3px solid #ff6666;">
-                                    <label style="color: #ff6666;">🚫 GEX Weight (DISABLED)</label>
+                                <!-- GEX Enable/Disable Toggle -->
+                                <div class="control-row gex-toggle-row" style="background: #f0f8ff; border-left: 3px solid #4CAF50; margin-bottom: 10px;">
+                                    <label style="font-weight: bold;">🎛️ GEX Control</label>
+                                    <label class="toggle-switch" style="margin-left: auto;">
+                                        <input type="checkbox" id="enableGEX">
+                                        <span class="toggle-slider"></span>
+                                        <span class="toggle-label">Enable GEX</span>
+                                    </label>
+                                </div>
+                                <div class="control-row gex-weight-row" id="gexWeightRow" style="background: #ffeeee; opacity: 0.6; border-left: 3px solid #ff6666;">
+                                    <label id="gexWeightLabel" style="color: #ff6666;">🚫 GEX Weight (DISABLED)</label>
                                     <input type="range" id="gexWeight" min="0.0" max="0.5" step="0.05" value="0.0" style="opacity: 0.5;" disabled>
                                     <span id="gexWeightValue" style="color: #ff6666; font-weight: bold;">0.0 (DISABLED)</span>
                                 </div>

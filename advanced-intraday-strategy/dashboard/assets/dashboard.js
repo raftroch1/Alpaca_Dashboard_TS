@@ -204,6 +204,11 @@ class TradingDashboard {
             });
         });
 
+        // GEX Enable/Disable Toggle
+        document.getElementById('enableGEX').addEventListener('change', (e) => {
+            this.handleGEXToggle(e.target.checked);
+        });
+
         // Click outside modal to close
         document.getElementById('backtestModal').addEventListener('click', (e) => {
             if (e.target.id === 'backtestModal') {
@@ -466,7 +471,68 @@ class TradingDashboard {
         }
     }
     
-    toggleGEXControls(gexWeight) {
+    handleGEXToggle(enabled) {
+        const gexWeightRow = document.getElementById('gexWeightRow');
+        const gexWeightInput = document.getElementById('gexWeight');
+        const gexWeightLabel = document.getElementById('gexWeightLabel');
+        const gexWeightValue = document.getElementById('gexWeightValue');
+        
+        if (enabled) {
+            // Enable GEX
+            gexWeightRow.style.background = '#eefff0';
+            gexWeightRow.style.borderLeft = '3px solid #4CAF50';
+            gexWeightRow.style.opacity = '1';
+            
+            gexWeightLabel.style.color = '#4CAF50';
+            gexWeightLabel.textContent = '✅ GEX Weight (ENABLED)';
+            
+            gexWeightInput.disabled = false;
+            gexWeightInput.style.opacity = '1';
+            gexWeightInput.value = '0.25'; // Default enabled weight
+            
+            gexWeightValue.style.color = '#4CAF50';
+            gexWeightValue.style.fontWeight = 'bold';
+            gexWeightValue.textContent = '0.25';
+            
+            // Update current config
+            this.currentConfig.gexWeight = 0.25;
+            
+            this.addLog('🟢 GEX ENABLED: Gamma analysis now active in signal generation', 'success');
+            
+            // Show GEX Controls panel
+            this.toggleGEXControlsPanel(true);
+            
+        } else {
+            // Disable GEX
+            gexWeightRow.style.background = '#ffeeee';
+            gexWeightRow.style.borderLeft = '3px solid #ff6666';
+            gexWeightRow.style.opacity = '0.6';
+            
+            gexWeightLabel.style.color = '#ff6666';
+            gexWeightLabel.textContent = '🚫 GEX Weight (DISABLED)';
+            
+            gexWeightInput.disabled = true;
+            gexWeightInput.style.opacity = '0.5';
+            gexWeightInput.value = '0.0';
+            
+            gexWeightValue.style.color = '#ff6666';
+            gexWeightValue.style.fontWeight = 'bold';
+            gexWeightValue.textContent = '0.0 (DISABLED)';
+            
+            // Update current config
+            this.currentConfig.gexWeight = 0.0;
+            
+            this.addLog('🔴 GEX DISABLED: Gamma analysis excluded from signal generation', 'info');
+            
+            // Hide GEX Controls panel
+            this.toggleGEXControlsPanel(false);
+        }
+        
+        // Save to localStorage
+        this.saveParametersToStorage();
+    }
+
+    toggleGEXControlsPanel(show) {
         // Find all elements that contain "GEX Controls" text
         const allH4s = document.querySelectorAll('h4');
         let gexControlsPanel = null;
@@ -478,14 +544,13 @@ class TradingDashboard {
         });
         
         if (gexControlsPanel) {
-            if (gexWeight === 0) {
-                gexControlsPanel.style.display = 'none';
-                console.log('🚫 GEX Controls hidden - GEX Weight is 0');
-                this.addLog('GEX Controls hidden (weight = 0)', 'info');
-            } else {
+            if (show) {
                 gexControlsPanel.style.display = 'block';
-                console.log('✅ GEX Controls shown - GEX Weight > 0');
-                this.addLog('GEX Controls shown (weight > 0)', 'info');
+                gexControlsPanel.style.opacity = '1';
+                console.log('✅ GEX Controls panel shown');
+            } else {
+                gexControlsPanel.style.display = 'none';
+                console.log('🚫 GEX Controls panel hidden');
             }
         }
     }

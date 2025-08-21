@@ -205,6 +205,10 @@ export interface OptionsChain {
   last?: number;
   impliedVolatility?: number;
   delta?: number;
+  gamma?: number;        // Real gamma from market data (critical for GEX accuracy)
+  theta?: number;        // Time decay (important for 0DTE)
+  vega?: number;         // Volatility sensitivity
+  rho?: number;          // Interest rate sensitivity
   volume?: number;
   openInterest?: number;
 }

@@ -104,13 +104,14 @@ export class DirectInstitutionalIntegration {
     
     const fullConfig = { ...this.DEFAULT_CONFIG, ...config };
     
-    // FORCE GEX DISABLED to fix bullish bias (override any dashboard settings)
-    fullConfig.gexWeight = 0.0;
+    // 🎛️ RESPECT DASHBOARD GEX SETTINGS (allow user control)
+    // Only force other weights, let user control GEX via dashboard
     fullConfig.avwapWeight = 0.40; // Increase AVWAP for trend following
     fullConfig.avpWeight = 0.25;   // Increase AVP
     fullConfig.fractalWeight = 0.25; // Increase fractals
     
-    console.log(`🚫 GEX FORCE DISABLED - Using trend-following weights: AVWAP(0.40), AVP(0.25), Fractals(0.25)`);
+    const gexStatus = fullConfig.gexWeight > 0 ? `ENABLED(${fullConfig.gexWeight})` : 'DISABLED(0.0)';
+    console.log(`🎛️ GEX USER CONTROLLED: ${gexStatus} - Using weights: AVWAP(0.40), AVP(0.25), Fractals(0.25)`);
     const currentPrice = marketData[marketData.length - 1].close;
     
     console.log(`🎯 DIRECT INSTITUTIONAL INTEGRATION`);
@@ -135,13 +136,13 @@ export class DirectInstitutionalIntegration {
     try {
       gexAnalysis = GammaExposureEngine.calculateGEX(optionsChain, currentPrice);
       
-      // FORCE GEX DISABLED regardless of config
+      // 🎛️ RESPECT USER GEX SETTINGS from dashboard
       if (fullConfig.gexWeight === 0) {
         gexScore = 0;
-        console.log(`   📊 GEX Score: 0.00 (DISABLED - was causing bullish bias)`);
+        console.log(`   📊 GEX Score: 0.00 (USER DISABLED via dashboard)`);
       } else {
         gexScore = this.scoreGEX(gexAnalysis, currentPrice);
-        console.log(`   📊 GEX Score: ${gexScore.toFixed(2)} (${gexAnalysis.volatilityRegime}, ${gexAnalysis.gammaRisk})`);
+        console.log(`   📊 GEX Score: ${gexScore.toFixed(2)} (USER ENABLED - ${gexAnalysis.volatilityRegime}, ${gexAnalysis.gammaRisk})`);
       }
     } catch (error: any) {
       console.log(`   ❌ GEX Analysis failed: ${error.message}`);
@@ -201,16 +202,17 @@ export class DirectInstitutionalIntegration {
       console.log(`   ❌ ATR Analysis failed: ${error.message}`);
     }
     
-    // Calculate weighted total score (FORCE GEX TO 0)
+    // Calculate weighted total score (RESPECT USER GEX SETTINGS)
     const totalScore = (
-      0 * fullConfig.gexWeight +  // FORCE GEX TO 0 regardless of weight
+      gexScore * fullConfig.gexWeight +      // USER CONTROLLED - can be 0.0 or enabled weight
       avpScore * fullConfig.avpWeight +
       avwapScore * fullConfig.avwapWeight +
       fractalScore * fullConfig.fractalWeight +
       atrScore * fullConfig.atrWeight
     );
     
-    console.log(`🚫 FORCED GEX TO 0 - Calculation: AVP(${avpScore.toFixed(2)}×${fullConfig.avpWeight}) + AVWAP(${avwapScore.toFixed(2)}×${fullConfig.avwapWeight}) + Fractals(${fractalScore.toFixed(2)}×${fullConfig.fractalWeight}) + ATR(${atrScore.toFixed(2)}×${fullConfig.atrWeight}) = ${totalScore.toFixed(2)}`);
+    const gexCalc = fullConfig.gexWeight > 0 ? `GEX(${gexScore.toFixed(2)}×${fullConfig.gexWeight}) + ` : '';
+    console.log(`🎛️ USER CONTROLLED - Calculation: ${gexCalc}AVP(${avpScore.toFixed(2)}×${fullConfig.avpWeight}) + AVWAP(${avwapScore.toFixed(2)}×${fullConfig.avwapWeight}) + Fractals(${fractalScore.toFixed(2)}×${fullConfig.fractalWeight}) + ATR(${atrScore.toFixed(2)}×${fullConfig.atrWeight}) = ${totalScore.toFixed(2)}`);
     
     // 🏛️ PROFESSIONAL MARKET BIAS DETECTION - Advanced Market Internals
     const marketBias = MarketBiasDetector.detectBias(marketData, optionsChain, undefined, dashboardParams);
@@ -300,7 +302,10 @@ export class DirectInstitutionalIntegration {
     }
     
     console.log(`\n📊 SCORING RESULTS:`);
-    console.log(`   GEX: 0.00 (DISABLED - was causing bullish bias)`);
+    const gexDisplay = fullConfig.gexWeight > 0 ? 
+      `${gexScore.toFixed(2)} (weight: ${fullConfig.gexWeight}) - USER ENABLED` : 
+      '0.00 (USER DISABLED via dashboard)';
+    console.log(`   GEX: ${gexDisplay}`);
     console.log(`   AVP: ${avpScore.toFixed(2)} (weight: ${fullConfig.avpWeight})`);
     console.log(`   AVWAP: ${avwapScore.toFixed(2)} (weight: ${fullConfig.avwapWeight})`);
     console.log(`   Fractals: ${fractalScore.toFixed(2)} (weight: ${fullConfig.fractalWeight})`);

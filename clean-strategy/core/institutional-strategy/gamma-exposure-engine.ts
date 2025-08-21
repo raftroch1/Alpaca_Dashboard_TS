@@ -184,15 +184,18 @@ export class GammaExposureEngine {
       const callGamma = this.calculateCallGamma(options.calls, currentPrice, strike);
       const putGamma = this.calculatePutGamma(options.puts, currentPrice, strike);
       
-      // Net gamma (assuming market makers are short customer flow)
-      // Customers typically buy calls and puts, so MMs are short both
-      const netGamma = callGamma - Math.abs(putGamma); // Puts contribute negative gamma to MMs
+      // 🚨 CRITICAL FIX: Net gamma calculation corrected
+      // Market makers are short customer flow (customers buy options, MMs sell)
+      // Both calls and puts contribute POSITIVE gamma to MM exposure when customers buy
+      const netGamma = callGamma + putGamma; // FIXED: Both contribute positive gamma to MM exposure
       
-      // Dollar gamma calculation: Spot × Gamma × OI × Contract Size × Spot × 0.01
+      // 🚨 CRITICAL FIX: Dollar gamma calculation corrected (removed double price multiplication)
       const totalCallOI = options.calls.reduce((sum, opt) => sum + (opt.openInterest || 0), 0);
       const totalPutOI = options.puts.reduce((sum, opt) => sum + (opt.openInterest || 0), 0);
       
-      const dollarGamma = currentPrice * netGamma * config.contractSize * currentPrice * config.spotPercentMove;
+      // FIXED: Dollar Gamma = Net Gamma × Contract Size × Current Price × Spot Move %
+      // Removed erroneous double price multiplication
+      const dollarGamma = netGamma * config.contractSize * currentPrice * config.spotPercentMove;
       
       const gammaData: GammaExposureData = {
         strike,
@@ -212,7 +215,7 @@ export class GammaExposureEngine {
   }
   
   /**
-   * Calculate gamma for call options at a strike
+   * Calculate gamma for call options at a strike using real market data
    */
   private static calculateCallGamma(
     calls: OptionsChain[],
@@ -227,19 +230,24 @@ export class GammaExposureEngine {
       (call.openInterest || 0) > (max.openInterest || 0) ? call : max
     );
     
-    // Simplified gamma calculation - in production, use Black-Scholes
-    // Gamma is highest ATM and decreases as options move ITM/OTM
+    // 🎯 PHASE 1 FIX: Use real gamma from market data when available
+    if (primaryCall.gamma !== undefined && primaryCall.openInterest) {
+      const realGamma = primaryCall.gamma * primaryCall.openInterest;
+      console.log(`   📊 Real Call Gamma: Strike ${strike} = ${primaryCall.gamma.toFixed(4)} × ${primaryCall.openInterest} OI = ${realGamma.toFixed(2)}`);
+      return realGamma;
+    }
+    
+    // Fallback to improved approximation only if no real gamma data
+    console.log(`   ⚠️  No real gamma data for call strike ${strike}, using approximation`);
     const moneyness = currentPrice / strike;
     const timeToExpiration = this.getTimeToExpiration(primaryCall.expiration);
-    
-    // Simplified gamma approximation
     const gammaApprox = this.approximateGamma(moneyness, timeToExpiration, 'CALL');
     
     return gammaApprox * (primaryCall.openInterest || 0);
   }
   
   /**
-   * Calculate gamma for put options at a strike
+   * Calculate gamma for put options at a strike using real market data
    */
   private static calculatePutGamma(
     puts: OptionsChain[],
@@ -254,10 +262,17 @@ export class GammaExposureEngine {
       (put.openInterest || 0) > (max.openInterest || 0) ? put : max
     );
     
+    // 🎯 PHASE 1 FIX: Use real gamma from market data when available
+    if (primaryPut.gamma !== undefined && primaryPut.openInterest) {
+      const realGamma = primaryPut.gamma * primaryPut.openInterest;
+      console.log(`   📊 Real Put Gamma: Strike ${strike} = ${primaryPut.gamma.toFixed(4)} × ${primaryPut.openInterest} OI = ${realGamma.toFixed(2)}`);
+      return realGamma;
+    }
+    
+    // Fallback to improved approximation only if no real gamma data
+    console.log(`   ⚠️  No real gamma data for put strike ${strike}, using approximation`);
     const moneyness = currentPrice / strike;
     const timeToExpiration = this.getTimeToExpiration(primaryPut.expiration);
-    
-    // Simplified gamma approximation
     const gammaApprox = this.approximateGamma(moneyness, timeToExpiration, 'PUT');
     
     return gammaApprox * (primaryPut.openInterest || 0);
